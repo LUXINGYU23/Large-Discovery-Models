@@ -15,13 +15,14 @@ from ldm_tts.engine.run_store import atomic_json_write
 from tasks.antibody.core.engine_adapters import _sequence_violations
 from tasks.antibody.tools.structure_design.common import extract_h3
 from ..sequence_design import mutation_options, mutate_sequences, validate_sequence
+from ..optional_tools import OptionalProteinTools
 
 TEMPLATE = Path(__file__).resolve().parents[3] / "antibody/tools/structure_design/examples/1n8z_vh.json"
 REPO = TEMPLATE.parents[5]
 FIXED_MAX_PROPOSAL_BATCHES = 3
 
 
-class DesignWorker:
+class DesignWorker(OptionalProteinTools):
     def __init__(self, run_dir, args, *, seed_backbones=None, execution_gpu=None, runtime_cache=None,
                  prelaunch_retry=None):
         self.jobs = Path(run_dir).resolve() / "design_jobs"
@@ -54,7 +55,7 @@ class DesignWorker:
         # generation limits still charge every call, including before a resume.
         batches = FIXED_MAX_PROPOSAL_BATCHES if self.args.method == "fixed" else 1
         return {
-            "backbones": batches * self.args.backbones_per_round - sum(j["action"] == "design_h3" for j in jobs),
+            "backbones": batches * self.args.backbones_per_round - sum(j.get("backbones_requested", int(j["action"] == "design_h3")) for j in jobs),
             "sequences": batches * self.args.sequences_per_round - sum(j["count"] for j in jobs),
         }
 
@@ -67,10 +68,20 @@ class DesignWorker:
                 seen.add(row["sequence"])
         return available
 
-    def execute(self, action, count=None, temperature=0.5, backbone_id=None, seed_sequence=None,
+    def execute(self, action, count=None, temperature=None, backbone_id=None, seed_sequence=None,
                 mutable_positions=None, min_mutations=1, max_mutations=2, allowed_amino_acids=None,
                 sequences=None, rationale=None, call_id=None, profile_id=None):
-        if action not in ("design_h3", "sequence_h3", "mutate_h3", "register_h3"):
+        if action == "sequence_h3_soluble" and not getattr(self.args, "enable_protein_tools", False):
+            raise ValueError("Optional protein tools must be enabled by the host")
+        boltzgen = action == "design_h3_boltzgen"
+        if boltzgen:
+            if not getattr(self.args, "enable_boltzgen", False):
+                raise ValueError("BoltzGen must be enabled by the host")
+            if temperature is not None:
+                raise ValueError("BoltzGen uses native diffusion settings, without MPNN temperature")
+        elif temperature is None:
+            temperature = 0.5
+        if action not in ("design_h3", "sequence_h3", "sequence_h3_soluble", "design_h3_boltzgen", "mutate_h3", "register_h3"):
             raise ValueError("Unknown generation action")
         directed = action in ("mutate_h3", "register_h3")
         if directed:
@@ -111,9 +122,9 @@ class DesignWorker:
                 return receipt["candidates"]
         if type(count) is not int or count < 1:
             raise ValueError("count must be a positive integer")
-        if type(temperature) not in (int, float) or not math.isfinite(temperature) or not 0.01 <= temperature <= 1:
+        if not boltzgen and (type(temperature) not in (int, float) or not math.isfinite(temperature) or not 0.01 <= temperature <= 1):
             raise ValueError("temperature must be in [0.01,1]")
-        if (action == "sequence_h3") != bool(backbone_id):
+        if (action in ("sequence_h3", "sequence_h3_soluble")) != bool(backbone_id):
             raise ValueError("sequence_h3 requires a generated backbone ID")
         if self.round == 0 and not self.args.seed_bank and (action != "design_h3" or temperature != self.args.temperature or
                                 count != min(self.args.samples_per_call, self.remaining()["sequences"])):
@@ -121,22 +132,26 @@ class DesignWorker:
         known = {r["backbone_id"] for r in self.candidates().values()}
         if backbone_id and backbone_id not in known and backbone_id not in self.seed_backbones:
             raise ValueError("Unknown backbone ID in this campaign")
+        if backbone_id and backbone_id.endswith("/boltzgen"):
+            raise ValueError("BoltzGen backbones are not compatible with ProteinMPNN resequencing")
+        backbone_count = int(action == "design_h3" or boltzgen)
         remaining = self.remaining()
-        if count > remaining["sequences"] or (action == "design_h3" and remaining["backbones"] < 1):
+        if count > remaining["sequences"] or backbone_count > remaining["backbones"]:
             raise ValueError(f"Generation budget exceeded. Remaining {remaining}")
         index = len(list(self.jobs.glob("job-*")))
         job = self.jobs / f"job-{index:05d}"
         job.mkdir()
-        backbone = None if directed else backbone_id or job.name
+        backbone = None if directed else f"{job.name}/boltzgen" if boltzgen else backbone_id or job.name
         seed = self.args.seed + index
         receipt = dict(round=self.round, action=action, count=count, temperature=temperature,
                        backbone_id=backbone, seed=seed, mock_generator=self.args.mock,
+                       backbones_requested=backbone_count,
                        status="started", call_id=call_id, parameters=params)
         path = job / "receipt.json"
         atomic_json_write(path, receipt)
         try:
             if self.runtime:
-                self.runtime.consume_many({"backbones_requested": int(action == "design_h3"),
+                self.runtime.consume_many({"backbones_requested": backbone_count,
                                            "sequences_requested": count}, usage_key=job.name)
             if action == "register_h3":
                 sequences = list(sequences)
@@ -149,13 +164,20 @@ class DesignWorker:
                 source = self.args.initialization_run.resolve() / "design_jobs" / job.name
                 sequences = self.replay_initialization(job, source, receipt)
                 receipt["initialization_source"] = str(source)
+            elif boltzgen:
+                sequences = self.run_boltzgen(job, count, seed)
+            elif action == "sequence_h3_soluble":
+                sequences = self.run_models(job, backbone_id, count, temperature, seed, soluble=True)
             else:
                 sequences = self.run_models(job, backbone_id, count, temperature, seed)
             rows = [dict(design_id=f"{job.name}/{i}", backbone_id=backbone, sequence=h3,
-                         artifact=(job / ("receipt.json" if self.args.mock or directed else "output/designs.json")).relative_to(self.jobs.parent).as_posix(),
+                         artifact=(job / ("receipt.json" if self.args.mock or directed else "output/candidates.json" if boltzgen else "output/designs.json")).relative_to(self.jobs.parent).as_posix(),
                          index=i, violations=_sequence_violations(h3, 11),
                          generation_action=action, parent_sequence=seed_sequence, rationale=rationale)
                     for i, h3 in enumerate(sequences)]
+            if action in ("sequence_h3_soluble", "design_h3_boltzgen"):
+                for row in rows:
+                    row["generation_action"] = action
             receipt.update(status="succeeded", candidates=rows)
             return rows
         except Exception as exc:
@@ -196,7 +218,7 @@ class DesignWorker:
             raise ValueError("Initialization receipt differs from mapped full VH sequences")
         return sequences
 
-    def run_models(self, job, backbone_id, count, temperature, seed):
+    def run_models(self, job, backbone_id, count, temperature, seed, *, soluble=False):
         import fcntl
 
         root = self.args.root.resolve()
@@ -206,6 +228,12 @@ class DesignWorker:
             assets = json.loads((self.runtime_cache / "manifest.json").read_text())
             for key in ("input_structure", "rfd3_checkpoint", "proteinmpnn_checkpoint"):
                 config[key] = str(self.runtime_cache / assets[key]["file"])
+        if soluble:
+            config["proteinmpnn_variant"] = "soluble"
+            config.pop("proteinmpnn_checkpoint", None)
+            checkpoint = getattr(self.args, "solublempnn_checkpoint", None)
+            if checkpoint:
+                config["proteinmpnn_checkpoint"] = str(checkpoint.expanduser().resolve())
         atomic_json_write(job / "config.json", config)
         cpus = sorted(os.sched_getaffinity(0))[:self.args.cpu_limit]
         env = dict(os.environ, PYTHONPATH=str(REPO))

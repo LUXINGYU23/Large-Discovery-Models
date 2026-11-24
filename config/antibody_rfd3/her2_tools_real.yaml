@@ -1,0 +1,18 @@
+name: antibody_rfd3_her2_tools_real
+task: antibody_rfd3
+algorithm: ldm_harness
+mode: real
+description: Three-evaluation optional protein-tool integration session with real
+  HER2 Absolut scoring.
+args:
+  method: ldm_harness
+  oracle: absolut
+  antigen: 1N8Z_C
+  iterations: 3
+  pool-size: 2
+  seed: 42
+  concurrency: 1
+  absolut-path: /Aidata/shared/ldm/antibody-poc/runs/her2-stream-640-d8808f4d/absolut
+  out-dir: runs/antibody_rfd3/her2-tools-real
+  enable-protein-tools: true
+  enable-boltzgen: true

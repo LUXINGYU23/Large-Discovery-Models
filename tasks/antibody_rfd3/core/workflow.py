@@ -12,6 +12,8 @@ from tasks.antibody.core.engine_adapters import SEQUENCE_CONSTRAINTS
 from .experiments import ENERGY_UTILITY
 from .policy import FEATURE_VERSION, H3_LENGTH, FEATURE_NAMES
 
+from .optional_tools import add_optional_args, validate_optional_args
+
 PI_METHODS = ("harness", "ldm_harness")
 METHODS = (*PI_METHODS, "fixed", "antbo")
 
@@ -59,6 +61,7 @@ def parse_args(argv=None):
     p.add_argument("--out-dir", type=Path, default=Path("runs/antibody_rfd3"))
     p.add_argument("--resume-run", type=Path, help="Resume an existing asynchronous campaign directory")
     p.add_argument("--dry-run", action="store_true")
+    add_optional_args(p)
     a = p.parse_args(argv)
     if a.method is None:
         a.method = "fixed" if a.mock else "ldm_harness"
@@ -105,6 +108,7 @@ def parse_args(argv=None):
         p.error("seed and GPU index must be nonnegative and temperature in [0.01,1]")
     if a.mock and a.initialization_run:
         p.error("mock generation cannot replay a real-generator initialization")
+    validate_optional_args(p, a, PI_METHODS)
     return a
 
 
@@ -124,6 +128,12 @@ def describe_ldm_task(args):
         if not args.research_candidates_per_role:
             actions = ("antbo_local",)
             roles, skills = ["policy_architect"], ["compile-ldm-policy"]
+    if getattr(args, "enable_protein_tools", False) or getattr(args, "enable_boltzgen", False):
+        skills.append("cdrh3-protein-tools")
+    if getattr(args, "enable_protein_tools", False):
+        actions += ("sequence_h3_soluble",)
+    if getattr(args, "enable_boltzgen", False):
+        actions += ("design_h3_boltzgen",)
     if args.method == "antbo":
         actions += ("antbo_suggest",)
     return LDMTaskSpec("antibody_rfd3",

@@ -21,12 +21,15 @@ from ldm_tts.harness.pi_research import PiResearchSource, ProposalContract
 from ldm_tts.transport.openai import OpenAICompatibleProposalClient
 from tasks.antibody.core.engine_adapters import AntibodyCandidateDomain
 
+from .optional_tools import active_tools, optional_host_flags
+from .interface import score_interface
+
 RESOURCES = Path(__file__).resolve().parents[1] / "resources/harness"
 TOOLS = ("design_h3", "sequence_h3", "mutate_h3", "register_h3", "candidate_catalog")
 PANEL = ("explorer", "refiner", "evidence_reviewer")
 
 
-def profile(role="cdrh3_research"):
+def profile(role="cdrh3_research", args=None):
     role_dir = "research" if role == "cdrh3_research" else role
     agents = f"profiles/{role_dir}/AGENTS.md"
     skills = ["skills/cdrh3-design"]
@@ -34,6 +37,8 @@ def profile(role="cdrh3_research"):
         skills.append("skills/cdrh3-experiment-design")
     elif role == "evidence_reviewer":
         skills.append("skills/cdrh3-evidence-review")
+    if getattr(args, "enable_protein_tools", False) or getattr(args, "enable_boltzgen", False):
+        skills.append("skills/cdrh3-protein-tools")
     return HarnessProfile(role, Path("/resources") / agents, tuple(Path("/resources") / p for p in skills),
                           file_sha256(RESOURCES / agents), tuple(directory_sha256(RESOURCES / p) for p in skills))
 
@@ -62,48 +67,57 @@ def worker_socket(worker, *, workspaces):
                 if self.path != "/" or not 0 < length <= 65536:
                     raise ValueError("Invalid design request")
                 request = json.loads(self.rfile.read(length))
-                role = request.get("profile_id")
-                refresh = request.get("action") == "candidate_catalog"
-                if refresh:
-                    if set(request) != {"action", "call_id", "profile_id"}:
-                        raise ValueError("Invalid catalog request")
-                    rows = ()
+                if request.get("action") == "score_interface":
+                    if not getattr(worker.args, "enable_protein_tools", False):
+                        raise ValueError("Optional protein tools must be enabled by the host")
+                    if set(request) != {"action", "artifact_id", "call_id", "profile_id"}:
+                        raise ValueError("Invalid interface scoring request")
+                    if request.get("profile_id") not in (*PANEL, "cdrh3_research"):
+                        raise ValueError("Unknown scoring role")
+                    data = {"interface_score": score_interface(worker, request.get("artifact_id"))}
                 else:
-                    rows = worker.execute(**request)
-                eligible = worker.eligible(rows)
-                data = {"remaining": worker.remaining(),
-                        "role_remaining": worker.role_remaining(role)}
-                if rows:
-                    data.update(backbone_id=rows[0]["backbone_id"], sampled=len(rows),
-                                eligible_unique_new=len(eligible))
-                if worker.args.method == "ldm_harness" and getattr(worker.args, "research_candidates_per_role", 0):
-                    if role not in ("explorer", "refiner"):
-                        raise ValueError("Only generation roles have candidate catalogs")
-                    # Rebuild from durable receipts, so a replay never resamples or loses earlier calls.
-                    available = worker.eligible(row for job in worker.records()
-                        if job["round"] == worker.round and job.get("profile_id") == role
-                        and job.get("status") == "succeeded" for row in job.get("candidates", ()))
-                    compact = [{key: row.get(key) for key in (
-                        "design_id", "sequence", "backbone_id", "generation_action", "parent_sequence",
-                        "parent_history_seqs", "rationale")}
-                               for row in available]
-                    relative = Path("generated") / f"g{worker.round + 1:06d}.json"
-                    atomic_json_write(workspaces[role] / relative,
-                                      {"generation": worker.round + 1, "role": role, "candidates": compact})
-                    data.update(candidate_catalog=f"/workspace/{relative.as_posix()}",
-                                total_eligible_unique_new=len(compact))
-                    if len(compact) < worker.args.research_candidates_per_role:
-                        data["next_action"] = ("Generate more within the remaining role budget. If it is exhausted, "
-                                               "submit the available IDs; if asked to retry, resubmit them until "
-                                               "the host closes the turn as a rejected shortfall.")
-                    else:
-                        data["next_action"] = "Read the candidate catalog and submit the exact required count."
-                else:
+                    role = request.get("profile_id")
+                    refresh = request.get("action") == "candidate_catalog"
                     if refresh:
-                        raise ValueError("Candidate catalogs require exact role proposals")
-                    data["candidates"] = eligible
-                    if not eligible:
-                        data["next_action"] = "Choose an earlier eligible ID or sample another design."
+                        if set(request) != {"action", "call_id", "profile_id"}:
+                            raise ValueError("Invalid catalog request")
+                        rows = ()
+                    else:
+                        rows = worker.execute(**request)
+                    eligible = worker.eligible(rows)
+                    data = {"remaining": worker.remaining(),
+                            "role_remaining": worker.role_remaining(role)}
+                    if rows:
+                        data.update(backbone_id=rows[0]["backbone_id"], sampled=len(rows),
+                                    eligible_unique_new=len(eligible))
+                    if worker.args.method == "ldm_harness" and getattr(worker.args, "research_candidates_per_role", 0):
+                        if role not in ("explorer", "refiner"):
+                            raise ValueError("Only generation roles have candidate catalogs")
+                        # Rebuild from durable receipts, so a replay never resamples or loses earlier calls.
+                        available = worker.eligible(row for job in worker.records()
+                            if job["round"] == worker.round and job.get("profile_id") == role
+                            and job.get("status") == "succeeded" for row in job.get("candidates", ()))
+                        compact = [{key: row.get(key) for key in (
+                            "design_id", "sequence", "backbone_id", "generation_action", "parent_sequence",
+                            "parent_history_seqs", "rationale")}
+                                   for row in available]
+                        relative = Path("generated") / f"g{worker.round + 1:06d}.json"
+                        atomic_json_write(workspaces[role] / relative,
+                                          {"generation": worker.round + 1, "role": role, "candidates": compact})
+                        data.update(candidate_catalog=f"/workspace/{relative.as_posix()}",
+                                    total_eligible_unique_new=len(compact))
+                        if len(compact) < worker.args.research_candidates_per_role:
+                            data["next_action"] = ("Generate more within the remaining role budget. If it is exhausted, "
+                                                   "submit the available IDs; if asked to retry, resubmit them until "
+                                                   "the host closes the turn as a rejected shortfall.")
+                        else:
+                            data["next_action"] = "Read the candidate catalog and submit the exact required count."
+                    else:
+                        if refresh:
+                            raise ValueError("Candidate catalogs require exact role proposals")
+                        data["candidates"] = eligible
+                        if not eligible:
+                            data["next_action"] = "Choose an earlier eligible ID or sample another design."
                 status = 200
             except (TypeError, ValueError, RuntimeError, OSError) as exc:
                 status, data = 400, {"error": str(exc)}
@@ -117,6 +131,7 @@ def worker_socket(worker, *, workspaces):
             pass
 
     with tempfile.TemporaryDirectory(prefix="h3-") as directory:
+        optional_host_flags(worker, directory)
         with UnixStreamServer(str(Path(directory) / "design.sock"), Handler) as server:
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
@@ -462,14 +477,16 @@ def open_agent(args, directory, worker, bridge, campaign_id):
             if not batch:
                 budgets["candidate_catalog"] = 0
             if role == "evidence_reviewer":
-                budgets.update(design_h3=0, sequence_h3=0, mutate_h3=0, register_h3=0, candidate_catalog=0)
+                budgets.update({name: 0 for name in active_tools(args, TOOLS) if name != "score_interface"})
+            if getattr(args, "enable_protein_tools", False):
+                budgets["score_interface"] = 4
             count = (args.research_candidates_per_role if batch and role != "evidence_reviewer"
                      else args.pool_size if role in PANEL else 1)
             # Allow a shortfall report through the tool schema; the host contract rejects partial batches.
             minimum = 0 if batch and role != "evidence_reviewer" else 1
             wall_time = (1800 if role == "evidence_reviewer" else 9000) if batch else 900
             response_timeout = wall_time + 300 if batch else 2100
-            config = PiHarnessConfig(artifact_root=Path("/artifacts"), profiles=(profile(role),),
+            config = PiHarnessConfig(artifact_root=Path("/artifacts"), profiles=(profile(role, args),),
                 campaign_id=campaign_id, task_id="antibody_rfd3", case_id=args.antigen, seed=args.seed,
                 submission_contract=submission_contract(count, review=role == "evidence_reviewer", minimum=minimum),
                 limits=HarnessLimits(wall_time_seconds=wall_time, tool_call_budgets=budgets),
@@ -477,7 +494,7 @@ def open_agent(args, directory, worker, bridge, campaign_id):
                 thinking=os.environ.get("LLM_REASONING_EFFORT", "off"), context7_enabled=False,
                 force_first_tool_call=False, guest_runtime=load_pi_guest_runtime("antibody_rfd3", RESOURCES / "image"),
                 tool_extensions=(HarnessToolExtension(Path("/resources") / extension,
-                                 file_sha256(RESOURCES / extension), TOOLS),), history=bridge.service.config)
+                                 file_sha256(RESOURCES / extension), active_tools(args, TOOLS)),), history=bridge.service.config)
             cmd = pi_sidecar_command(artifact_root, args.sidecar_image, cache_root=args.guest_cache,
                                      mounts=((RESOURCES, "/resources", True), (socket_dir, "/worker", True)))
             client = stack.enter_context(HarnessClient(cmd, api_key=key, config=config, history=bridge.service,

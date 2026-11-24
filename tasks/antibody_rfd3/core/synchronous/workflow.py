@@ -25,6 +25,8 @@ from .evaluator import IsolatedAbsolutEvaluator
 from .worker import DesignWorker
 from ..seed_bank import load_seed_bank
 
+from ..optional_tools import add_optional_args, validate_optional_args
+
 METHODS = ("harness", "fixed", "antbo")
 
 
@@ -57,6 +59,7 @@ def parse_args(argv=None):
     p.add_argument("--out-dir", type=Path, default=Path("runs/antibody_rfd3"))
     p.add_argument("--resume-run", type=Path, help="Continue an existing Fixed or Pi Harness run")
     p.add_argument("--dry-run", action="store_true")
+    add_optional_args(p)
     a = p.parse_args(argv)
     if a.batch_size < 1 or a.batch_size > a.pool_size:
         p.error("batch-size must fit the candidate pool")
@@ -72,6 +75,7 @@ def parse_args(argv=None):
         p.error("seed and GPU index must be nonnegative and temperature in [0.01,1]")
     if a.mock and (a.method != "fixed" or a.oracle != "mock"):
         p.error("--mock is the offline fixed-method fixture. Use --oracle mock alone for real tools and Pi.")
+    validate_optional_args(p, a, ("harness",))
     return a
 
 
@@ -81,6 +85,10 @@ def metric(a):
 
 def describe_ldm_task(args):
     actions = ("design_h3", "sequence_h3", "mutate_h3", "register_h3") if args.method == "harness" else ("design_h3",)
+    if getattr(args, "enable_protein_tools", False):
+        actions += ("sequence_h3_soluble",)
+    if getattr(args, "enable_boltzgen", False):
+        actions += ("design_h3_boltzgen",)
     if args.method == "antbo":
         actions += ("antbo_suggest",)
     return LDMTaskSpec("antibody_rfd3",
@@ -91,7 +99,7 @@ def describe_ldm_task(args):
                       for action in actions), "AntibodyCandidateDomain", "H3 sequence within one antigen"),
         SurrogateSpaceSpec("none", "no campaign GP", "none"),
         ProposalSearchSpec(args.method, parameters={"oracle": args.oracle, "mock_generator": args.mock,
-                           "skill_ids": ["cdrh3-design"] if args.method == "harness" else []}),
+                           "skill_ids": (["cdrh3-design"] + (["cdrh3-protein-tools"] if getattr(args, "enable_protein_tools", False) or getattr(args, "enable_boltzgen", False) else [])) if args.method == "harness" else []}),
         metadata={"antigen": args.antigen, "template": "1N8Z B1-120", "h3": "B99-B109"})
 
 

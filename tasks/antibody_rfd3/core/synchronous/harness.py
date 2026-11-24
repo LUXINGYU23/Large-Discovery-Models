@@ -18,6 +18,9 @@ from ldm_tts.harness.container import pi_sidecar_command
 from ldm_tts.harness.pi import PiHarnessConfig, load_pi_guest_runtime
 from ldm_tts.transport.openai import OpenAICompatibleProposalClient
 
+from ..optional_tools import active_tools, optional_host_flags
+from ..interface import score_interface
+
 RESOURCES = Path(__file__).resolve().parents[2] / "resources/baseline_harness"
 TOOLS = ("design_h3", "sequence_h3", "mutate_h3", "register_h3", "candidate_catalog")
 SKILL = "skills/cdrh3-design"
@@ -25,10 +28,13 @@ ROLE = "profiles/research/AGENTS.md"
 TURN_RECOVERY_SECONDS = 600
 
 
-def profile():
+def profile(args=None):
+    skills = [SKILL]
+    if getattr(args, "enable_protein_tools", False) or getattr(args, "enable_boltzgen", False):
+        skills.append("skills/cdrh3-protein-tools")
     return HarnessProfile("cdrh3_research", Path("/resources") / ROLE,
-                          (Path("/resources") / SKILL,), file_sha256(RESOURCES / ROLE),
-                          (directory_sha256(RESOURCES / SKILL),))
+                          tuple(Path("/resources") / skill for skill in skills), file_sha256(RESOURCES / ROLE),
+                          tuple(directory_sha256(RESOURCES / skill) for skill in skills))
 
 
 def submission_contract():
@@ -49,17 +55,26 @@ def worker_socket(worker):
                 if self.path != "/" or not 0 < length <= 65536:
                     raise ValueError("Invalid design request")
                 params = json.loads(self.rfile.read(length))
-                if params["action"] == "candidate_catalog":
-                    rows = [row for job in worker.records() if job["round"] == worker.round
-                            and job["status"] == "succeeded" for row in job.get("candidates", [])]
+                if params.get("action") == "score_interface":
+                    if not getattr(worker.args, "enable_protein_tools", False):
+                        raise ValueError("Optional protein tools must be enabled by the host")
+                    if set(params) != {"action", "artifact_id", "call_id", "profile_id"}:
+                        raise ValueError("Invalid interface scoring request")
+                    if params.get("profile_id") not in ("cdrh3_research",):
+                        raise ValueError("Unknown scoring role")
+                    data = {"interface_score": score_interface(worker, params.get("artifact_id"))}
                 else:
-                    rows = worker.execute(**params)
-                eligible = worker.eligible(rows)
-                data = {"backbone_id": rows[0]["backbone_id"] if rows else None, "candidates": eligible,
-                        "sampled": len(rows), "eligible_unique_new": len(eligible),
-                        "remaining": worker.remaining()}
-                if not eligible:
-                    data["next_action"] = "Choose eligible IDs from earlier calls or sample again, for example with sequence_h3 on another existing backbone."
+                    if params["action"] == "candidate_catalog":
+                        rows = [row for job in worker.records() if job["round"] == worker.round
+                                and job["status"] == "succeeded" for row in job.get("candidates", [])]
+                    else:
+                        rows = worker.execute(**params)
+                    eligible = worker.eligible(rows)
+                    data = {"backbone_id": rows[0]["backbone_id"] if rows else None, "candidates": eligible,
+                            "sampled": len(rows), "eligible_unique_new": len(eligible),
+                            "remaining": worker.remaining()}
+                    if not eligible:
+                        data["next_action"] = "Choose eligible IDs from earlier calls or sample again, for example with sequence_h3 on another existing backbone."
                 status = 200
             except (TypeError, ValueError, RuntimeError, OSError) as exc:
                 status, data = 400, {"error": str(exc)}
@@ -73,6 +88,7 @@ def worker_socket(worker):
             pass
 
     with tempfile.TemporaryDirectory(prefix="h3-") as directory:
+        optional_host_flags(worker, directory)
         with UnixStreamServer(str(Path(directory) / "design.sock"), Handler) as server:
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
@@ -96,14 +112,14 @@ def open_agent(args, runtime, worker):
     root.mkdir(exist_ok=True)
     extension = "tools/design.mjs"
     config = PiHarnessConfig(
-        artifact_root=Path("/artifacts"), profiles=(profile(),), campaign_id=runtime.run_id,
+        artifact_root=Path("/artifacts"), profiles=(profile(args),), campaign_id=runtime.run_id,
         task_id="antibody_rfd3", case_id=args.antigen, seed=args.seed,
         submission_contract=submission_contract(), limits=HarnessLimits(wall_time_seconds=900,
             tool_call_budgets={"web_search": 0, "web_fetch": 0}),
         base_url=url.removesuffix("/responses"), model=model, context7_enabled=False,
         force_first_tool_call=False, guest_runtime=load_pi_guest_runtime("antibody_rfd3", RESOURCES / "image"),
         tool_extensions=(HarnessToolExtension(Path("/resources") / extension,
-                                              file_sha256(RESOURCES / extension), TOOLS),))
+                                              file_sha256(RESOURCES / extension), active_tools(args, TOOLS)),))
     with worker_socket(worker) as socket_dir:
         image = os.environ.get("LDM_PI_RESUME_IMAGE") if args.resume_run else None
         environment = {

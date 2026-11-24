@@ -15,12 +15,13 @@ from ldm_tts.engine.run_store import atomic_json_write
 from tasks.antibody.core.engine_adapters import _sequence_violations
 from tasks.antibody.tools.structure_design.common import extract_h3
 from .sequence_design import mutation_options, mutate_sequences, validate_sequence
+from .optional_tools import OptionalProteinTools
 
 TEMPLATE = Path(__file__).resolve().parents[2] / "antibody/tools/structure_design/examples/1n8z_vh.json"
 REPO = TEMPLATE.parents[5]
 
 
-class DesignWorker:
+class DesignWorker(OptionalProteinTools):
     def __init__(self, run_dir, args, *, seed_backbones=None):
         self.jobs = Path(run_dir).resolve() / "design_jobs"
         self.jobs.mkdir(exist_ok=True, parents=True)
@@ -42,7 +43,7 @@ class DesignWorker:
 
     def remaining(self):
         jobs = [j for j in self.records() if j["round"] == self.round]
-        return {"backbones": self.args.backbones_per_round - sum(j["action"] == "design_h3" for j in jobs),
+        return {"backbones": self.args.backbones_per_round - sum(j.get("backbones_requested", int(j["action"] == "design_h3")) for j in jobs),
                 "sequences": self.args.sequences_per_round - sum(j["count"] for j in jobs)}
 
     def role_budget(self, profile_id):
@@ -65,7 +66,7 @@ class DesignWorker:
     def role_remaining(self, profile_id):
         limits = self.role_budget(profile_id)
         jobs = [j for j in self.records() if j["round"] == self.round and j.get("profile_id") == profile_id]
-        return {"backbones": limits["backbones"] - sum(j["action"] == "design_h3" for j in jobs),
+        return {"backbones": limits["backbones"] - sum(j.get("backbones_requested", int(j["action"] == "design_h3")) for j in jobs),
                 "sequences": limits["sequences"] - sum(j["count"] for j in jobs)}
 
     def eligible(self, rows):
@@ -80,10 +81,20 @@ class DesignWorker:
                 seen.add(row["sequence"])
         return available
 
-    def execute(self, action, count=None, temperature=0.5, backbone_id=None, call_id=None, profile_id=None,
+    def execute(self, action, count=None, temperature=None, backbone_id=None, call_id=None, profile_id=None,
                 seed_sequence=None, mutable_positions=None, min_mutations=1, max_mutations=2,
                 allowed_amino_acids=None, sequences=None, rationale=None):
-        if action not in ("design_h3", "sequence_h3", "mutate_h3", "register_h3"):
+        if action == "sequence_h3_soluble" and not getattr(self.args, "enable_protein_tools", False):
+            raise ValueError("Optional protein tools must be enabled by the host")
+        boltzgen = action == "design_h3_boltzgen"
+        if boltzgen:
+            if not getattr(self.args, "enable_boltzgen", False):
+                raise ValueError("BoltzGen must be enabled by the host")
+            if temperature is not None:
+                raise ValueError("BoltzGen uses native diffusion settings, without MPNN temperature")
+        elif temperature is None:
+            temperature = 0.5
+        if action not in ("design_h3", "sequence_h3", "sequence_h3_soluble", "design_h3_boltzgen", "mutate_h3", "register_h3"):
             raise ValueError("Unknown generation action")
         directed = action in ("mutate_h3", "register_h3")
         parameters = None
@@ -118,9 +129,9 @@ class DesignWorker:
             raise ValueError("count must be a positive integer")
         if action == "mutate_h3" and count > sum(size for _, size in groups):
             raise ValueError("Requested count exceeds the unique sequence capacity of these mutation constraints")
-        if type(temperature) not in (int, float) or not math.isfinite(temperature) or not 0.01 <= temperature <= 1:
+        if not boltzgen and (type(temperature) not in (int, float) or not math.isfinite(temperature) or not 0.01 <= temperature <= 1):
             raise ValueError("temperature must be in [0.01,1]")
-        if (action == "sequence_h3") != bool(backbone_id):
+        if (action in ("sequence_h3", "sequence_h3_soluble")) != bool(backbone_id):
             raise ValueError("sequence_h3 requires a generated backbone ID")
         if call_id is not None and (not isinstance(call_id, str) or not call_id):
             raise ValueError("call_id must be a non-empty string")
@@ -149,21 +160,24 @@ class DesignWorker:
         known = {r["backbone_id"] for r in self.candidates().values()}
         if backbone_id and backbone_id not in known and backbone_id not in self.seed_backbones:
             raise ValueError("Unknown backbone ID in this campaign")
+        if backbone_id and backbone_id.endswith("/boltzgen"):
+            raise ValueError("BoltzGen backbones are not compatible with ProteinMPNN resequencing")
+        backbone_count = int(action == "design_h3" or boltzgen)
         remaining = self.remaining()
-        if count > remaining["sequences"] or (action == "design_h3" and remaining["backbones"] < 1):
+        if count > remaining["sequences"] or backbone_count > remaining["backbones"]:
             raise ValueError(f"Generation budget exceeded. Remaining {remaining}")
         role_remaining = self.role_remaining(profile_id)
-        if count > role_remaining["sequences"] or (action == "design_h3" and role_remaining["backbones"] < 1):
+        if count > role_remaining["sequences"] or backbone_count > role_remaining["backbones"]:
             raise ValueError(f"Role generation budget exceeded. Remaining {role_remaining}")
         index = len(list(self.jobs.glob("job-*")))
         job = self.jobs / f"job-{index:05d}"
         job.mkdir()
-        backbone = None if directed else backbone_id or job.name
+        backbone = None if directed else f"{job.name}/boltzgen" if boltzgen else backbone_id or job.name
         seed = self.args.seed + index
         receipt = dict(round=self.round, action=action, count=count, temperature=temperature, profile_id=profile_id,
                        call_id=call_id, requested_backbone_id=backbone_id,
                        backbone_id=backbone, seed=seed, mock_generator=self.args.mock,
-                       status="started")
+                       backbones_requested=backbone_count, status="started")
         if directed:
             receipt["sequence_design"] = parameters
             receipt["parent_history"] = [entry.to_dict() for entry in self.history_log.view().results
@@ -172,7 +186,7 @@ class DesignWorker:
         atomic_json_write(path, receipt)
         try:
             if self.runtime:
-                self.runtime.consume_many({"backbones_requested": int(action == "design_h3"),
+                self.runtime.consume_many({"backbones_requested": backbone_count,
                                            "sequences_requested": count}, usage_key=job.name)
             if action == "register_h3":
                 proposed = list(sequences)
@@ -185,16 +199,23 @@ class DesignWorker:
                 source = self.args.initialization_run.resolve() / "design_jobs" / job.name
                 proposed = self.replay_initialization(job, source, receipt)
                 receipt["initialization_source"] = str(source)
+            elif boltzgen:
+                proposed = self.run_boltzgen(job, count, seed)
+            elif action == "sequence_h3_soluble":
+                proposed = self.run_models(job, backbone_id, count, temperature, seed, soluble=True)
             else:
                 proposed = self.run_models(job, backbone_id, count, temperature, seed)
             rows = [dict(design_id=f"{job.name}/{i}", backbone_id=backbone, sequence=h3,
-                         artifact=(job / ("receipt.json" if self.args.mock or directed else "output/designs.json")).relative_to(self.jobs.parent).as_posix(),
+                         artifact=(job / ("receipt.json" if self.args.mock or directed else "output/candidates.json" if boltzgen else "output/designs.json")).relative_to(self.jobs.parent).as_posix(),
                          index=i, violations=_sequence_violations(h3, 11))
                     for i, h3 in enumerate(proposed)]
             if directed:
                 for row in rows:
                     row.update(generation_action=action, parent_sequence=seed_sequence, rationale=rationale,
                                parent_history_seqs=[entry["seq"] for entry in receipt["parent_history"]])
+            if action in ("sequence_h3_soluble", "design_h3_boltzgen"):
+                for row in rows:
+                    row["generation_action"] = action
             receipt.update(status="succeeded", candidates=rows)
             return rows
         except Exception as exc:
@@ -235,7 +256,7 @@ class DesignWorker:
             raise ValueError("Initialization receipt differs from mapped full VH sequences")
         return sequences
 
-    def run_models(self, job, backbone_id, count, temperature, seed):
+    def run_models(self, job, backbone_id, count, temperature, seed, *, soluble=False):
         import fcntl
 
         root = self.args.root.resolve()
@@ -245,6 +266,12 @@ class DesignWorker:
             path = getattr(self.args, name)
             if path is not None:
                 config[name] = str(path.expanduser().resolve())
+        if soluble:
+            config["proteinmpnn_variant"] = "soluble"
+            config.pop("proteinmpnn_checkpoint", None)
+            checkpoint = getattr(self.args, "solublempnn_checkpoint", None)
+            if checkpoint:
+                config["proteinmpnn_checkpoint"] = str(checkpoint.expanduser().resolve())
         atomic_json_write(job / "config.json", config)
         cpus = sorted(os.sched_getaffinity(0))[:self.args.cpu_limit]
         env = dict(os.environ, PYTHONPATH=str(REPO))

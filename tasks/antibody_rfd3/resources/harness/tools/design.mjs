@@ -1,4 +1,5 @@
 import { request } from "node:http";
+import { existsSync } from "node:fs";
 import { basename, dirname } from "node:path";
 
 function generate(action, params, callId, profileId) {
@@ -18,6 +19,23 @@ function generate(action, params, callId, profileId) {
 }
 
 export default function register(pi) {
+  if (existsSync("/worker/protein-tools.enabled")) {
+    pi.registerTool({name: "sequence_h3_soluble", label: "sequence_h3_soluble",
+      description: "Sample soluble ProteinMPNN sequences on an existing RFD3 backbone. Shares the sequence budget; does not establish expression or solubility.",
+      parameters: {type: "object", additionalProperties: false,
+        properties: {backbone_id: {type: "string"}, count: {type: "integer", minimum: 1}, temperature: {type: "number", minimum: 0.01, maximum: 1}},
+        required: ["backbone_id", "count", "temperature"]},
+      execute: (id, params, _signal, _onUpdate, ctx) => generate("sequence_h3_soluble", params, id, basename(dirname(ctx.cwd)))});
+    pi.registerTool({name: "score_interface", label: "score_interface",
+      description: "Compute auxiliary ipSAE for a host-prepared genuine structure/PAE artifact ID. Does not predict structures, establish affinity, or change Absolut scores.",
+      parameters: {type: "object", additionalProperties: false, properties: {artifact_id: {type: "string"}}, required: ["artifact_id"]},
+      execute: (id, params, _signal, _onUpdate, ctx) => generate("score_interface", params, id, basename(dirname(ctx.cwd)))});
+  }
+  if (existsSync("/worker/boltzgen.enabled")) pi.registerTool({name: "design_h3_boltzgen", label: "design_h3_boltzgen",
+    description: "Generate one fixed-framework H3 backbone and count native inverse-folded sequences. Consumes one shared backbone and count sequence slots. Returned backbones cannot enter ProteinMPNN resequencing.",
+    parameters: {type: "object", additionalProperties: false, properties: {count: {type: "integer", minimum: 1}}, required: ["count"]},
+    execute: (id, params, _signal, _onUpdate, ctx) => generate("design_h3_boltzgen", params, id, basename(dirname(ctx.cwd)))});
+
   for (const name of ["design_h3", "sequence_h3"]) {
     const properties = {count: {type: "integer", minimum: 1},
       temperature: {type: "number", minimum: 0.01, maximum: 1}};

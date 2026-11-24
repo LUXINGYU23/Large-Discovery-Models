@@ -46,6 +46,20 @@ def check_dependencies(plan, *, include_optional=True):
     if method in ("ldm_harness", "harness"):
         check("Pi endpoint", env.get("LLM_BASE_URL") and env.get("LLM_MODEL_NAME") and
               (env.get("LLM_API_KEY") or env.get("OPENAI_API_KEY")), "Responses endpoint, model and API key")
+    if args.get("enable-protein-tools") and not args.get("mock"):
+        from tasks.antibody.tools.structure_design.bootstrap import MPNN_COMMIT
+        checkpoint = args.get("solublempnn-checkpoint") or root / f"archive/models/proteinmpnn/{MPNN_COMMIT}/soluble/v_48_020.pt"
+        check("SolubleMPNN weights", Path(checkpoint).is_file() and Path(str(checkpoint) + ".source.json").is_file(),
+              "Soluble weights and source record; never reuse the vanilla override")
+        script = env.get("IPSAE_SCRIPT")
+        check("ipSAE script", script and Path(script).is_file(), "Configure IPSAE_SCRIPT for auxiliary interface scoring")
+    if args.get("enable-boltzgen") and not args.get("mock"):
+        suffix = {"HER2": "HER2", "1N8Z_C": "HER2", "PD-1": "PD1", "5GGR_Y": "PD1"}.get(args.get("antigen"))
+        check("BoltzGen antigen", suffix is not None, "Configured HER2 or PD-1 antigen")
+        for key in ("BOLTZGEN_PYTHON", "BOLTZGEN_SCAFFOLD", "BOLTZGEN_CHECKPOINT", "BOLTZGEN_INVERSE_FOLD_CHECKPOINT", "BOLTZGEN_MOLDIR", "BOLTZGEN_SPEC_" + (suffix or "UNCONFIGURED")):
+            path = env.get(key)
+            check(key, path and Path(path).is_file() and (key != "BOLTZGEN_PYTHON" or os.access(path, os.X_OK)),
+                  "Required only for the enabled native BoltzGen tool")
     if method == "antbo":
         check("Native AntBO", (Path(env.get("ANTBO_HOME", "")) / "bo/optimizer.py").is_file(),
               "ANTBO_HOME must point to upstream HEBO/AntBO")

@@ -28,11 +28,15 @@ def resolve_config(path, root_override=None):
         root = path.parent / root
     root = root.resolve()
     config["workspace_root"] = str(root)
+    variant = config.get("proteinmpnn_variant", "vanilla")
+    if variant not in ("vanilla", "soluble"):
+        raise ValueError("proteinmpnn_variant must be vanilla or soluble")
+    weight_subdir = "soluble/" if variant == "soluble" else ""
     defaults = {
         "rfd3_python": "env/rfd3/bin/python", "proteinmpnn_python": "env/proteinmpnn/bin/python",
         "proteinmpnn_source": "env/sources/ProteinMPNN",
         "rfd3_checkpoint": "archive/models/rfd3/2025-12-01/rfd3.ckpt",
-        "proteinmpnn_checkpoint": f"archive/models/proteinmpnn/{MPNN_COMMIT}/v_48_020.pt",
+        "proteinmpnn_checkpoint": f"archive/models/proteinmpnn/{MPNN_COMMIT}/{weight_subdir}v_48_020.pt",
     }
     for name, default in defaults.items():
         value = Path(config.get(name, default)).expanduser()
@@ -274,6 +278,8 @@ def sequence(config, directory, env, origin, candidates):
             "--model_name", "v_48_020", "--seed", config.get("seed", 42) + i,
             "--num_seq_per_target", config.get("sequences_per_design", 1), "--batch_size", 1,
             "--sampling_temp", config.get("sampling_temperature", 0.1), "--backbone_noise", 0.0]
+        if config.get("proteinmpnn_variant", "vanilla") == "soluble":
+            command.append("--use_soluble_model")
         execution = run_command(model_command(config, command), directory, f"proteinmpnn-{i:04d}", env)
         fasta = read_fasta(target / "output/seqs/backbone.fa")
         sampled = [record for record in fasta if "sample=" in record[0]]

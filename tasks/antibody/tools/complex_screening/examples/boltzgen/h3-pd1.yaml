@@ -1,0 +1,6 @@
+entities:
+- file:
+    path: 5GGR.cif
+    include:
+    - chain: {id: E}
+- file: {path: fab.yaml}

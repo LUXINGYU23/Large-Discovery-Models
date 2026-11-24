@@ -201,6 +201,8 @@ def main() -> int:
             raise RuntimeError("Existing ProteinMPNN source is a different version")
         download(f"https://raw.githubusercontent.com/dauparas/ProteinMPNN/{MPNN_COMMIT}/vanilla_model_weights/v_48_020.pt",
                  root / f"archive/models/proteinmpnn/{MPNN_COMMIT}/v_48_020.pt")
+        download(f"https://raw.githubusercontent.com/dauparas/ProteinMPNN/{MPNN_COMMIT}/soluble_model_weights/v_48_020.pt",
+                 root / f"archive/models/proteinmpnn/{MPNN_COMMIT}/soluble/v_48_020.pt")
         download("https://files.rcsb.org/download/1N8Z.pdb",
                  root / "archive/data/structure_design/1N8Z.pdb")
     if args.stage in ("all", "env"):
