@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+import threading
 from dataclasses import asdict, replace
 from pathlib import Path
 
@@ -645,3 +646,258 @@ def test_maximum_validation_attempts_rejects_the_turn(tmp_path: Path) -> None:
     assert attempts == [1, 2, 3]
     assert result[0].submission_status == "rejected"
     assert result[0].validation_errors == (error,)
+
+
+def _start_mock_provider_server(responses_list):
+    """Spin up a loopback Responses API server returning scripted (status, body) tuples."""
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    received = []
+    remaining = list(responses_list)
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, format, *args):
+            pass
+
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length", "0"))
+            raw = self.rfile.read(length)
+            received.append({
+                "path": self.path,
+                "auth": self.headers.get("Authorization"),
+                "body": json.loads(raw.decode("utf-8")) if raw else None,
+            })
+            status, body = remaining.pop(0) if len(remaining) > 1 else remaining[0]
+            encoded = body.encode("utf-8") if isinstance(body, str) else json.dumps(body).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, f"http://127.0.0.1:{server.server_port}", received
+
+
+def test_provider_429_retried_with_backoff_then_succeeds(tmp_path: Path, monkeypatch) -> None:
+    from ldm_tts.harness import client as client_module
+
+    now = [1000.0]
+    sleeps: list[float] = []
+
+    def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        now[0] += seconds
+
+    monkeypatch.setenv("HARNESS_TEST_ERROR_SEQUENCE", json.dumps([
+        {"code": "sidecar_error", "message": "OpenAI API error (429): rate_limit_exceeded"},
+        {"code": "recoverable_turn_error", "message": "OpenAI API error (429): Too Many Requests"},
+    ]))
+    config = HarnessPoolConfig(
+        artifact_root=tmp_path,
+        profiles=(HarnessProfile("research", Path("/resources/AGENTS.md"), agents_sha256="a" * 64),),
+        campaign_id="campaign", task_id="fixture", case_id="case", seed=0,
+        submission_contract=_candidate_contract(),
+    )
+    turn = HarnessTurn(
+        profile_id="research", turn_id="turn-429", round_index=1,
+        history_from_seq=0, history_to_seq=1, history_digest="c" * 64, message="research",
+    )
+    with HarnessClient(
+        (sys.executable, "-u", str(Path(__file__).parent / "fixtures/fake_harness_sidecar.py")),
+        api_key="fixture", config=config, response_timeout_seconds=5,
+    ) as client:
+        with monkeypatch.context() as mp:
+            mp.setattr(client_module.time, "monotonic", lambda: now[0])
+            mp.setattr(client_module.time, "sleep", fake_sleep)
+            (result,) = client.run_turn(
+                (turn,),
+                submission_validator=lambda _: HarnessSubmissionValidation(),
+                recovery_timeout_seconds=3600,
+            )
+    assert result.turn_id == "turn-429"
+    assert result.submission_status == "accepted"
+    assert sleeps == [1.0, 2.0]
+
+
+def test_provider_5xx_retried_and_capped_at_30_min(tmp_path: Path, monkeypatch) -> None:
+    from ldm_tts.harness import client as client_module
+
+    now = [2000.0]
+    sleeps: list[float] = []
+
+    def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        now[0] += seconds
+
+    # Part 1: transient 502/503 recovers after exponential backoff.
+    monkeypatch.setenv("HARNESS_TEST_ERROR_SEQUENCE", json.dumps([
+        {"code": "sidecar_error", "message": "OpenAI API error (502): Bad Gateway"},
+        {"code": "sidecar_error", "message": "OpenAI API error (503): Service Unavailable"},
+    ]))
+    config = HarnessPoolConfig(
+        artifact_root=tmp_path / "recover",
+        profiles=(HarnessProfile("research", Path("/resources/AGENTS.md"), agents_sha256="a" * 64),),
+        campaign_id="campaign", task_id="fixture", case_id="case", seed=0,
+        submission_contract=_candidate_contract(),
+    )
+    turn = HarnessTurn(
+        profile_id="research", turn_id="turn-5xx-ok", round_index=1,
+        history_from_seq=0, history_to_seq=1, history_digest="c" * 64, message="research",
+    )
+    with HarnessClient(
+        (sys.executable, "-u", str(Path(__file__).parent / "fixtures/fake_harness_sidecar.py")),
+        api_key="fixture", config=config, response_timeout_seconds=5,
+    ) as client:
+        with monkeypatch.context() as mp:
+            mp.setattr(client_module.time, "monotonic", lambda: now[0])
+            mp.setattr(client_module.time, "sleep", fake_sleep)
+            (result,) = client.run_turn(
+                (turn,),
+                submission_validator=lambda _: HarnessSubmissionValidation(),
+                recovery_timeout_seconds=3600,
+            )
+    assert result.submission_status == "accepted"
+    assert sleeps == [1.0, 2.0]
+
+    # Part 2: persistent 503 caps total retry wait at 30 min (1800s) even when recovery_timeout is 3600s.
+    sleeps.clear()
+    monkeypatch.delenv("HARNESS_TEST_ERROR_SEQUENCE", raising=False)
+    monkeypatch.setenv("HARNESS_TEST_TURN_FAILURE", "unknown")
+    monkeypatch.setenv("HARNESS_TEST_ERROR_CODE", "sidecar_error")
+    config2 = HarnessPoolConfig(
+        artifact_root=tmp_path / "cap",
+        profiles=(HarnessProfile("research", Path("/resources/AGENTS.md"), agents_sha256="a" * 64),),
+        campaign_id="campaign", task_id="fixture", case_id="case", seed=0,
+        submission_contract=_candidate_contract(),
+    )
+    turn2 = HarnessTurn(
+        profile_id="research", turn_id="turn-5xx-cap", round_index=1,
+        history_from_seq=0, history_to_seq=1, history_digest="c" * 64, message="research",
+    )
+    with HarnessClient(
+        (sys.executable, "-u", str(Path(__file__).parent / "fixtures/fake_harness_sidecar.py")),
+        api_key="fixture", config=config2, response_timeout_seconds=5,
+    ) as client:
+        with monkeypatch.context() as mp:
+            mp.setattr(client_module.time, "monotonic", lambda: now[0])
+            mp.setattr(client_module.time, "sleep", fake_sleep)
+            with pytest.raises(HarnessError) as caught:
+                client.run_turn(
+                    (turn2,),
+                    submission_validator=lambda _: HarnessSubmissionValidation(),
+                    recovery_timeout_seconds=3600,
+                )
+    assert caught.value.provider_error == "provider_server_error"
+    assert caught.value.retryable is True
+    assert sleeps[:7] == [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 60.0]
+    assert sum(sleeps) == pytest.approx(client_module.MAX_PROVIDER_RETRY_WAIT_SECONDS)
+    assert max(sleeps) == client_module.MAX_RETRY_BACKOFF_SECONDS
+
+    # Part 3: smaller recovery_timeout_seconds is strictly respected.
+    sleeps.clear()
+    with HarnessClient(
+        (sys.executable, "-u", str(Path(__file__).parent / "fixtures/fake_harness_sidecar.py")),
+        api_key="fixture", config=config2, response_timeout_seconds=5,
+    ) as client:
+        with monkeypatch.context() as mp:
+            mp.setattr(client_module.time, "monotonic", lambda: now[0])
+            mp.setattr(client_module.time, "sleep", fake_sleep)
+            with pytest.raises(HarnessError):
+                client.run_turn(
+                    (turn2,),
+                    submission_validator=lambda _: HarnessSubmissionValidation(),
+                    recovery_timeout_seconds=5.0,
+                )
+    assert sleeps == [1.0, 2.0, 2.0]
+    assert sum(sleeps) == pytest.approx(5.0)
+
+
+def test_provider_402_not_retried_and_classified_as_balance(tmp_path: Path, monkeypatch) -> None:
+    from ldm_tts.harness import client as client_module
+
+    sleeps: list[float] = []
+    # Even if the sidecar tagged it recoverable_turn_error, 402 must never retry.
+    monkeypatch.setenv("HARNESS_TEST_ERROR_SEQUENCE", json.dumps([
+        {
+            "code": "recoverable_turn_error",
+            "message": (
+                'Error: provider response failed: OpenAI API error (402): '
+                '{"message":"Insufficient Balance (request_id: abc)","type":"insufficient_balance_error"}'
+            ),
+        },
+    ]))
+    config = HarnessPoolConfig(
+        artifact_root=tmp_path,
+        profiles=(HarnessProfile("research", Path("/resources/AGENTS.md"), agents_sha256="a" * 64),),
+        campaign_id="campaign", task_id="fixture", case_id="case", seed=0,
+        submission_contract=_candidate_contract(),
+    )
+    turn = HarnessTurn(
+        profile_id="research", turn_id="turn-402", round_index=1,
+        history_from_seq=0, history_to_seq=1, history_digest="c" * 64, message="research",
+    )
+    with HarnessClient(
+        (sys.executable, "-u", str(Path(__file__).parent / "fixtures/fake_harness_sidecar.py")),
+        api_key="fixture", config=config, response_timeout_seconds=5,
+    ) as client:
+        with monkeypatch.context() as mp:
+            mp.setattr(client_module.time, "sleep", sleeps.append)
+            with pytest.raises(HarnessError) as caught:
+                client.run_turn(
+                    (turn,),
+                    submission_validator=lambda _: HarnessSubmissionValidation(),
+                    recovery_timeout_seconds=3600,
+                )
+    assert caught.value.provider_error == "provider_balance"
+    assert caught.value.retryable is False
+    assert sleeps == []
+
+
+def test_probe_provider_against_mock_server(tmp_path: Path, capsys) -> None:
+    from ldm_tts.harness.client import main as client_main, probe_provider
+
+    secret = "sk-fixture-secret-value"
+    server, base_url, received = _start_mock_provider_server([
+        (200, {"id": "resp_1", "status": "completed"}),
+        (402, {"message": f"Insufficient Balance echo {secret}", "type": "insufficient_balance_error"}),
+        (429, {"message": "rate_limit_exceeded"}),
+        (503, {"message": "service unavailable"}),
+        (200, {"id": "resp_2", "status": "completed"}),
+    ])
+    try:
+        ok = probe_provider(base_url, "deepseek-flash", secret)
+        assert ok["status"] == 200 and ok["model"] == "deepseek-flash"
+        assert received[0]["path"] == "/responses"
+        assert received[0]["auth"] == f"Bearer {secret}"
+        assert received[0]["body"]["max_output_tokens"] == 1
+        assert received[0]["body"]["model"] == "deepseek-flash"
+        assert received[0]["body"]["stream"] is False
+
+        with pytest.raises(HarnessError) as err402:
+            probe_provider(base_url, "deepseek-flash", secret)
+        assert err402.value.provider_error == "provider_balance"
+        assert err402.value.retryable is False
+        assert secret not in str(err402.value)
+
+        with pytest.raises(HarnessError) as err429:
+            probe_provider(base_url, "deepseek-flash", secret)
+        assert err429.value.provider_error == "provider_rate_limit"
+        assert err429.value.retryable is True
+
+        key_file = tmp_path / "dummy.key"
+        key_file.write_text(secret + "\n")
+        assert client_main(["probe", "--base-url", base_url, "--model", "deepseek-flash",
+                            "--api-key-file", str(key_file)]) == 1
+        out_fail = json.loads(capsys.readouterr().out)
+        assert out_fail["ok"] is False and out_fail["provider_error"] == "provider_server_error"
+
+        assert client_main(["probe", "--base-url", base_url, "--model", "deepseek-flash",
+                            "--api-key-file", str(key_file)]) == 0
+        out_ok = json.loads(capsys.readouterr().out)
+        assert out_ok["ok"] is True and out_ok["status"] == 200
+    finally:
+        server.shutdown()
+        server.server_close()

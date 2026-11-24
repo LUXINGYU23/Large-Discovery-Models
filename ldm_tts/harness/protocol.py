@@ -17,11 +17,20 @@ _SHA256_PATTERN = re.compile(r"[a-f0-9]{64}")
 
 
 class HarnessError(RuntimeError):
-    def __init__(self, message: str, *, turn_usage: Mapping[str, Mapping[str, Any]] | None = None, retryable: bool = False, code: str | None = None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        turn_usage: Mapping[str, Mapping[str, Any]] | None = None,
+        retryable: bool = False,
+        code: str | None = None,
+        provider_error: str | None = None,
+    ):
         super().__init__(message)
         self.turn_usage = {profile: dict(usage) for profile, usage in (turn_usage or {}).items()}
         self.retryable = retryable
         self.code = code
+        self.provider_error = provider_error
 
 
 def canonical_sha256(value: Any) -> str:
