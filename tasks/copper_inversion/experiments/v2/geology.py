@@ -138,8 +138,8 @@ def structured_parent(seed,family):
             if count==2:center[:2]=.5+(-.23+.46*j)*np.array([np.cos(azimuth),np.sin(azimuth)])
             radii=rng.uniform([.18,.19,.13],[.29,.32,.22])
             if count==2:
-                radii[0]=rng.uniform(.13,.18)
-                radii[2]=rng.uniform(.045,.075)
+                radii[0]=rng.uniform(.16,.22)
+                radii[2]=rng.uniform(.08,.12)
             # Non-axis-aligned ellipsoid boundary constraints, interpolated by
             # GemPy. The analytic surface is not evaluated as the ground truth.
             angle=rng.uniform(-.5,.5) if count==1 else rng.choice([-1,1])*rng.uniform(.4,.9)

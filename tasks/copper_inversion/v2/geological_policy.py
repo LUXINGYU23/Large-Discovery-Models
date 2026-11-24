@@ -3,6 +3,8 @@
 This is a constrained synthetic benchmark, not a universal mine prior. The
 volume range is the existing generator's population range; four components
 defines the revised population for all families (including faulted bodies).
+A deposit model is built only after discovery: in-distribution cases have ore
+intersected by at least two public boreholes.
 No per-case truth, family label, measured label or true volume enters this map.
 """
 import numpy as np

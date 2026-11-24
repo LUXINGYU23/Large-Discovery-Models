@@ -31,17 +31,18 @@ EVIDENCE_V1=('calibration','population','historical_disjointness','confirmation'
 EVIDENCE_V2=EVIDENCE_V1+('hole_audit','layout','weak_judge')
 
 
-def verify_tiers(record,release=None):
+def verify_tiers(record,release=None,*,allow_unsealed=False):
     """The `tiers` object read by the evaluator service: contracts §2.1 shape exactly."""
     tiers=record.get('tiers')
-    if not isinstance(tiers,dict) or set(tiers)!={'S','F'}:raise ValueError('release tier table requires tiers S and F')
+    if not isinstance(tiers,dict) or set(tiers) not in ({'S','F'},{'S','M','F'}):
+        raise ValueError('release tier table requires tiers S and F')
     covered=record.get('manifest_sha256',{})
     for name,tier in tiers.items():
         if not isinstance(tier,dict) or set(tier)!=TIER_KEYS:raise ValueError('invalid tier fields: '+name)
         for key in ('solver_seconds','train_bodies','slots'):
             if type(tier[key]) is not int or tier[key]<1:raise ValueError(f'invalid tier {key}: {name}')
         manifests=[tier['train_manifest'],tier['validation_manifest'],*tier['sealed_manifests']]
-        if not tier['sealed_manifests'] or any(not isinstance(m,str) or m not in covered for m in manifests):
+        if (not tier['sealed_manifests'] and not allow_unsealed) or any(not isinstance(m,str) or m not in covered for m in manifests):
             raise ValueError('tier manifest not covered by qualification: '+name)
         if release is not None:
             cases=json.loads((Path(release)/tier['train_manifest']).read_text())['cases']

@@ -8,35 +8,37 @@ import hashlib
 import json
 from pathlib import Path
 import numpy as np
-from .geology import model_from_metadata, query_ore, terrain_height
+from tasks.copper_inversion.v2.contract import OBJECTIVE
 from tasks.copper_inversion.v2.data import save_problem
-from .measurement_policy import scales
+from .measurement_policy import DENSITIES, parse_cli_holes as _parse_cli_holes, parse_holes, scales
 from tasks.copper_inversion.v2.geological_policy import public_priors,POLICY_VERSION
 
 
-def build(parent, output, seed, noisy=False, coverage="uniform"):
-    if coverage not in {"uniform", "clustered"}:
-        raise ValueError("unknown predeclared observation coverage")
+def _load_parent(parent):
+    from .geology import model_from_metadata
     meta=json.loads((parent/"private-parent.json").read_text())
     encoded=(parent/"geology.npz").read_bytes()
     if hashlib.sha256(encoded).hexdigest()!=meta["geometry_sha256"]:
         raise ValueError("parent geometry digest changed")
     with np.load(parent/"geology.npz",allow_pickle=False) as data:
         truth,forbidden=data["truth"],data["forbidden_mask"]
+    return meta,truth,forbidden,model_from_metadata(meta)
+
+
+def build(parent, output, seed, noisy=False, coverage="uniform", holes=(3,12), outcrop_weight=.25, *, _loaded=None):
+    from .geology import query_ore, terrain_height
+    if coverage not in {"uniform", "clustered"}:
+        raise ValueError("unknown predeclared observation coverage")
+    lo,hi=parse_holes(holes)
+    meta,truth,forbidden,model=_load_parent(parent) if _loaded is None else _loaded
     shape=truth.shape; spacing=np.asarray(meta["spacing"]); origin=np.asarray(meta["origin"])
     rng=np.random.default_rng(seed)
-    model=model_from_metadata(meta)
-    points=[]; labels=[]; groups=[]
-    hole_count=int(rng.integers(3,13))
-    origin=np.asarray(meta["origin"]); spacing=np.asarray(meta["spacing"])
+    points=[]; labels=[]; groups=[]; true_ore=[]
+    hole_count=int(rng.integers(lo,hi+1))
     lower=origin+.5*spacing; upper=origin+(np.asarray(shape)-.5)*spacing
-    # OOD coverage is selected before observations, independently of ore. Both
-    # holes and outcrop samples cover the same random quarter-width window.
     coverage_rng=np.random.default_rng(np.random.SeedSequence([seed,8191]))
     window_lower=lower[:2]+coverage_rng.uniform(.1,.65,2)*(upper[:2]-lower[:2])
     window_upper=window_lower+.25*(upper[:2]-lower[:2])
-    # Resolve paths more finely than the output grid, then locate crossings by
-    # queries to the implicit geology. This does not interpolate a coarse SDF.
     paths=[]
     for group in range(hole_count):
         top=(rng.uniform(lower[:2]+spacing[:2],upper[:2]-spacing[:2]) if coverage=="uniform"
@@ -56,6 +58,7 @@ def build(parent, output, seed, noisy=False, coverage="uniform"):
         retain=rng.random(len(path))>.12
         selected=np.arange(len(path))[retain][::4]
         points.extend(path[selected]);labels.extend(ore[selected].astype(float));groups.extend([group]*len(selected))
+        true_ore.extend(ore[selected])
         for j in np.flatnonzero(ore[:-1]!=ore[1:]):
             left.append(path[j]);right.append(path[j+1]);left_labels.append(ore[j]);contact_groups.append(group)
     if left:
@@ -65,7 +68,9 @@ def build(parent, output, seed, noisy=False, coverage="uniform"):
             same=query_ore(model,midpoint,target_id=meta["ore_lithology_id"])==left_labels
             left[same]=midpoint[same];right[~same]=midpoint[~same]
         points.extend((left+right)/2);labels.extend([.5]*len(left));groups.extend(contact_groups)
+        true_ore.extend([False]*len(left))
     points=np.asarray(points);labels=np.asarray(labels);groups=np.asarray(groups,dtype=int)
+    true_ore=np.asarray(true_ore,dtype=bool)
     scale_policy=scales(spacing,noisy)
     physical_sigma=scale_policy["measurement_sigma"]
     effective_scale=scale_policy["effective_scale"]
@@ -75,10 +80,11 @@ def build(parent, output, seed, noisy=False, coverage="uniform"):
         binary=labels!=.5
         flips=binary&(rng.random(len(labels))<noise_rate)
         labels[flips]=1-labels[flips]
+    binary=labels!=.5
+    ore_holes=int(sum(bool((true_ore&binary&(labels==1)&(groups==g)).any()) for g in range(hole_count)))
+    observed_ore_holes=int(sum(bool((binary&(labels==1)&(groups==g)).any()) for g in range(hole_count)))
     observation=dict(name="drill",points=points,labels=labels,groups=groups,weight=1.,
         transition_scale=effective_scale,contact_sigma=effective_scale,label_error=noise_rate)
-    # Sample the actual continuous terrain, not a dense grid top face. A tiny
-    # inward offset gives the rock-side limiting classification.
     xy=(rng.uniform(lower[:2],upper[:2],size=(120,2)) if coverage=="uniform"
         else rng.uniform(window_lower,window_upper,size=(120,2)))
     z=terrain_height(meta,xy)
@@ -91,15 +97,18 @@ def build(parent, output, seed, noisy=False, coverage="uniform"):
     normalized=(xyz[:,:2]-origin[:2])/(np.asarray(shape[:2])*spacing[:2])
     spatial_groups=(normalized[:,0]*4).astype(int)*4+(normalized[:,1]*4).astype(int)
     outcrop=dict(name="outcrop",points=xyz,labels=surface_labels,groups=spatial_groups,
-        weight=1.,transition_scale=effective_scale,contact_sigma=effective_scale,label_error=noise_rate)
+        weight=float(outcrop_weight),transition_scale=effective_scale,contact_sigma=effective_scale,label_error=noise_rate)
     output.mkdir(parents=True,exist_ok=False)
     truth_dir=output/"private";truth_dir.mkdir();np.save(truth_dir/"truth.npy",truth)
     manifest=dict(stage="development-only",parent_digest=meta["geometry_sha256"],observation_seed=seed,
-        observation_recipe="implicit-query-v4",coverage=coverage,noise="noisy" if noisy else "clean",contact_bisection_steps=16,probe_spacing_fraction=.125,
+        observation_recipe="implicit-query-v4",coverage=coverage,noise="noisy" if noisy else "clean",
+        holes=[lo,hi],hole_count=hole_count,ore_holes=ore_holes,observed_ore_holes=observed_ore_holes,
+        contact_bisection_steps=16,probe_spacing_fraction=.125,
         scale_policy=scale_policy,area_prior_enabled=False,geological_policy=POLICY_VERSION,cases=[])
+    hole_tag="" if (lo,hi)==(3,12) else f":holes={lo}-{hi}"
     for name,observations in (("drill",[observation]),("drill_outcrop",[observation,outcrop])):
-        identifier=hashlib.sha256((meta["geometry_sha256"]+name+str(seed)+manifest["observation_recipe"]+manifest["noise"]+coverage+POLICY_VERSION).encode()).hexdigest()[:20]
-        problem=dict(schema_version="problem_schema_v2",geometry_version="occupancy_v2",objective_version="objective_v2",
+        identifier=hashlib.sha256((meta["geometry_sha256"]+name+str(seed)+manifest["observation_recipe"]+manifest["noise"]+coverage+POLICY_VERSION+hole_tag).encode()).hexdigest()[:20]
+        problem=dict(schema_version="problem_schema_v2",geometry_version="occupancy_v2",objective_version=OBJECTIVE,
             case_id=identifier,shape=list(shape),origin=origin.tolist(),spacing=spacing.tolist(),
             domain_mask=np.ones(shape,bool),forbidden_mask=forbidden,
             open_boundary_faces=["x-","x+","y-","y+","z-","z+"],observations=observations,
@@ -107,14 +116,33 @@ def build(parent, output, seed, noisy=False, coverage="uniform"):
         save_problem(problem,output/identifier)
         manifest["cases"].append(dict(case_id=identifier,modality=name,truth="private/truth.npy"))
     (output/"private-manifest.json").write_text(json.dumps(manifest,sort_keys=True,indent=2))
-    print(json.dumps(dict(stage=manifest["stage"],hole_count=hole_count,drill_labels=len(labels),contacts=int(np.count_nonzero(labels==.5)),cases=len(manifest["cases"]))))
+    summary=dict(stage=manifest["stage"],holes=[lo,hi],hole_count=hole_count,ore_holes=ore_holes,
+        observed_ore_holes=observed_ore_holes,drill_labels=len(labels),
+        contacts=int(np.count_nonzero(labels==.5)),cases=len(manifest["cases"]))
+    print(json.dumps(summary))
+    return summary
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument("--parent",type=Path,required=True);p.add_argument("--output",type=Path,required=True);p.add_argument("--seed",type=int,required=True)
+    p=argparse.ArgumentParser();p.add_argument("--parent",type=Path,required=True)
+    p.add_argument("--output",type=Path);p.add_argument("--seed",type=int)
+    p.add_argument("--batch",type=Path,help="JSON list of {seed, output} items sharing one loaded parent model")
     p.add_argument("--noisy",action="store_true")
     p.add_argument("--coverage",choices=["uniform","clustered"],default="uniform")
-    a=p.parse_args();build(a.parent,a.output,a.seed,a.noisy,a.coverage)
+    p.add_argument("--holes",nargs="+",help="borehole count N, range LO HI, or density lo|mid|hi")
+    a=p.parse_args()
+    holes=_parse_cli_holes(a.holes)
+    if a.batch is not None:
+        items=json.loads(a.batch.read_text())
+        loaded=_load_parent(a.parent)
+        for item in items:
+            out_dir=Path(item["output"])
+            if not (out_dir/"private-manifest.json").exists():
+                build(a.parent,out_dir,int(item["seed"]),a.noisy,a.coverage,holes=holes,_loaded=loaded)
+        return
+    if a.output is None or a.seed is None:
+        raise ValueError("--output and --seed are required unless --batch is passed")
+    build(a.parent,a.output,a.seed,a.noisy,a.coverage,holes=holes)
 
 
 if __name__=="__main__":main()

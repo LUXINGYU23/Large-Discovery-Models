@@ -39,7 +39,7 @@ def build(packs,output,split="train"):
 
 def main():
     p=argparse.ArgumentParser();p.add_argument("--packs",nargs="+",type=Path,required=True);p.add_argument("--output",type=Path,required=True)
-    p.add_argument("--split",choices=["train","validation","test_id","test_ood"],default="train")
+    p.add_argument("--split",choices=["train","calibration","calibration_ood","validation","test_id","test_ood"],default="train")
     a=p.parse_args();build(a.packs,a.output,a.split)
 
 

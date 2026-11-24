@@ -250,7 +250,8 @@ def load_manifest(path,packs_per_body=None):
     manifest=json.loads(path.read_text())
     if set(manifest)!={"schema","stage","split","seeds","cases"} or manifest["schema"]!="copper-suite-v2":
         raise ValueError("invalid suite manifest schema")
-    if manifest["stage"] not in {"development","formal"} or manifest["split"] not in {"train","validation","test_id","test_ood"}:
+    if manifest["stage"] not in {"development","formal"} or manifest["split"] not in {
+            "train","calibration","calibration_ood","validation","test_id","test_ood"}:
         raise ValueError("invalid suite scope")
     seeds=manifest["seeds"]
     if not seeds or len(set(seeds))!=len(seeds) or any(type(s) is not int or s<0 for s in seeds):
