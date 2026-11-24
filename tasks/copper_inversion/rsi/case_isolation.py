@@ -5,13 +5,16 @@ import hashlib
 import re
 
 CASE_FEEDBACK_MODES = ("none", "opaque", "public")
-CASE_ISOLATION_KEYS = ("anonymize_cases", "canonical_origin", "case_feedback", "refuse_case_ids")
+REQUIRED_CASE_ISOLATION_KEYS = ("anonymize_cases", "canonical_origin", "case_feedback", "refuse_case_ids")
+OPTIONAL_CASE_ISOLATION_KEYS = ("randomize_orientation",)
+CASE_ISOLATION_KEYS = REQUIRED_CASE_ISOLATION_KEYS + OPTIONAL_CASE_ISOLATION_KEYS
 
 DEFAULT_CASE_ISOLATION = {
     "anonymize_cases": True,
     "canonical_origin": True,
     "case_feedback": "none",
     "refuse_case_ids": True,
+    "randomize_orientation": False,
 }
 
 LEGACY_CASE_ISOLATION = {
@@ -19,22 +22,25 @@ LEGACY_CASE_ISOLATION = {
     "canonical_origin": False,
     "case_feedback": "public",
     "refuse_case_ids": False,
+    "randomize_orientation": False,
 }
 
 _HEX_ID = re.compile(r"[0-9a-f]{16,}")
 
 
 def validate_case_isolation(value):
-    if not isinstance(value, dict) or set(value) != set(CASE_ISOLATION_KEYS):
-        raise ValueError("case_isolation requires exactly: " + ", ".join(CASE_ISOLATION_KEYS))
-    for name in ("anonymize_cases", "canonical_origin", "refuse_case_ids"):
-        if type(value[name]) is not bool:
+    if not isinstance(value, dict) or not set(REQUIRED_CASE_ISOLATION_KEYS) <= set(value) <= set(CASE_ISOLATION_KEYS):
+        raise ValueError("case_isolation requires: " + ", ".join(REQUIRED_CASE_ISOLATION_KEYS)
+                         + " (optional: " + ", ".join(OPTIONAL_CASE_ISOLATION_KEYS) + ")")
+    normalized = {**value, "randomize_orientation": value.get("randomize_orientation", False)}
+    for name in ("anonymize_cases", "canonical_origin", "refuse_case_ids", "randomize_orientation"):
+        if type(normalized[name]) is not bool:
             raise ValueError(f"case_isolation.{name} must be a boolean")
-    if value["case_feedback"] not in CASE_FEEDBACK_MODES:
+    if normalized["case_feedback"] not in CASE_FEEDBACK_MODES:
         raise ValueError(f"case_isolation.case_feedback must be one of {CASE_FEEDBACK_MODES}")
-    if value["case_feedback"] == "opaque" and not value["anonymize_cases"]:
+    if normalized["case_feedback"] == "opaque" and not normalized["anonymize_cases"]:
         raise ValueError("case_isolation.case_feedback='opaque' requires anonymize_cases=true")
-    return {k: value[k] for k in CASE_ISOLATION_KEYS}
+    return {k: normalized[k] for k in CASE_ISOLATION_KEYS}
 
 
 def resolve_case_isolation(value):
@@ -49,6 +55,13 @@ def opaque_case_id(evaluation_key, case_id):
         raise ValueError("non-empty evaluation_key and case_id required")
     digest = hashlib.sha256(f"rsi-case-v1:{evaluation_key}:{case_id}".encode("utf-8")).hexdigest()[:16]
     return f"case-{digest}"
+
+
+def case_orientation(evaluation_key, case_id):
+    """Deterministic per-(evaluation, case) horizontal D4 orientation index in 0..7."""
+    if not isinstance(evaluation_key, str) or not evaluation_key or not isinstance(case_id, str) or not case_id:
+        raise ValueError("non-empty evaluation_key and case_id required")
+    return hashlib.sha256(f"rsi-orient-v1:{evaluation_key}:{case_id}".encode("utf-8")).digest()[0] & 7
 
 
 def export_case_id(index):

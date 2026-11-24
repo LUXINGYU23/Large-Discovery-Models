@@ -5,6 +5,10 @@ and aggregate training feedback, never this manifest or its truth directories.
 """
 import hashlib
 import json
+import math
+import os
+import re
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import numpy as np
@@ -13,8 +17,9 @@ from ldm_tts.contracts.evaluation import EVALUATION_ATTEMPT_RECEIPT_KEY, Evaluat
 from ldm_tts.engine.run_store import atomic_json_write
 from ..core.execution import digest, source_identity, freeze_model
 from ..core.geometry import read_model
-from ..rsi.case_isolation import opaque_case_id
-from .data import canonical_problem, read_problem, save_problem
+from ..rsi.case_isolation import case_orientation, opaque_case_id
+from .contract import validate as validate_problem
+from .data import canonical_problem, invert_orientation, read_problem, save_problem
 
 
 def file_hash(path):
@@ -24,6 +29,98 @@ def file_hash(path):
 OBJECTIVES=("confirmation","oracle_iou")
 AGGREGATIONS={"confirmation":"parent-macro-confirmation-utility-v1","oracle_iou":"parent-macro-oracle-iou-v1"}
 TIER_FIELDS={"solver_seconds","train_manifest","train_bodies","validation_manifest","sealed_manifests","slots"}
+_PACK=re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}")
+
+
+def confirmation_resample_seed(evaluation_key,case_id):
+    """Deterministic 32-bit seed per (evaluation, case) for resampled confirmation thinning."""
+    if not isinstance(evaluation_key,str) or not evaluation_key or not isinstance(case_id,str) or not case_id:
+        raise ValueError("non-empty evaluation_key and case_id required")
+    return int.from_bytes(hashlib.sha256(f"rsi-resample-v1:{evaluation_key}:{case_id}".encode("utf-8")).digest()[:4],"big")
+
+
+def validate_resample(spec):
+    if spec is None:return None
+    if not isinstance(spec,dict) or not {"fraction"}<=set(spec)<={"fraction","outcrop_grid"}:
+        raise ValueError("invalid confirmation resample specification")
+    fraction=spec["fraction"]
+    if type(fraction) not in (int,float) or not math.isfinite(fraction) or not 0<fraction<1:
+        raise ValueError("confirmation resample fraction must lie in (0, 1)")
+    out={"fraction":float(fraction)}
+    if "outcrop_grid" in spec:
+        grid=spec["outcrop_grid"]
+        if type(grid) is not int or grid<1:
+            raise ValueError("confirmation resample outcrop_grid must be a positive integer")
+        out["outcrop_grid"]=grid
+    return out
+
+
+def validate_confirmation_packs(packs):
+    if packs is None:return None
+    if packs=="all":return "all"
+    if (not isinstance(packs,(list,tuple)) or not packs or len(set(packs))!=len(packs)
+            or any(not isinstance(p,str) or _PACK.fullmatch(p) is None for p in packs)):
+        raise ValueError("confirmation_packs must be 'all' or a list of distinct pack names")
+    return list(packs)
+
+
+def merge_confirmations(problems):
+    """Union of multiple confirmation packs for the same parent, with non-colliding group ids."""
+    if not problems:raise ValueError("at least one confirmation pack is required")
+    if len(problems)==1:return problems[0]
+    first=problems[0]
+    for other in problems[1:]:
+        for key in ("schema_version","geometry_version","objective_version","shape","origin","spacing",
+                    "open_boundary_faces","priors"):
+            if other[key]!=first[key]:raise ValueError(f"confirmation packs differ on {key}")
+        for key in ("domain_mask","forbidden_mask"):
+            if not np.array_equal(other[key],first[key]):raise ValueError(f"confirmation packs differ on {key}")
+        if [o["name"] for o in other["observations"]]!=[o["name"] for o in first["observations"]]:
+            raise ValueError("confirmation packs have different observation modalities")
+    observations=[]
+    for index,base_obs in enumerate(first["observations"]):
+        pts,lbls,grps,offset=[],[],[],0
+        for pack in problems:
+            obs=pack["observations"][index]
+            for key in ("weight","transition_scale","contact_sigma","label_error"):
+                if obs[key]!=base_obs[key]:raise ValueError(f"confirmation packs differ on observation {key}")
+            pts.append(np.asarray(obs["points"],dtype=float))
+            lbls.append(np.asarray(obs["labels"],dtype=float))
+            g=np.asarray(obs["groups"],dtype=int)
+            grps.append(g+offset)
+            if len(g):offset+=int(g.max())+1
+        observations.append({**base_obs,"points":np.concatenate(pts,axis=0),
+                             "labels":np.concatenate(lbls,axis=0),"groups":np.concatenate(grps,axis=0)})
+    merged={**first,"observations":observations}
+    validate_problem(merged)
+    return merged
+
+
+def _load_confirmation(truth_root,confirmation_packs=None):
+    base=Path(truth_root)/"confirmation"
+    if confirmation_packs is None:
+        if (base/"problem.json").is_file():return read_problem(base)
+        if (base/"c0"/"problem.json").is_file():return read_problem(base/"c0")
+        raise ValueError("confirmation measurements missing")
+    if confirmation_packs=="all":
+        dirs=sorted(p for p in base.iterdir() if p.is_dir() and (p/"problem.json").is_file()) if base.is_dir() else []
+        if not dirs and (base/"problem.json").is_file():dirs=[base]
+        if not dirs:raise ValueError("no confirmation packs found")
+        return merge_confirmations([read_problem(p) for p in dirs])
+    loaded=[]
+    for name in confirmation_packs:
+        folder=base/name
+        if (folder/"problem.json").is_file():loaded.append(read_problem(folder))
+        elif name=="c0" and (base/"problem.json").is_file():loaded.append(read_problem(base))
+        else:raise ValueError(f"confirmation pack {name!r} is missing")
+    return merge_confirmations(loaded)
+
+
+def _chmod_readable(root):
+    root=Path(root)
+    for path in [root,*root.rglob("*")]:
+        if not path.is_symlink():
+            path.chmod(0o755 if path.is_dir() else 0o644)
 
 
 def aggregate(rows):
@@ -52,11 +149,21 @@ def aggregate(rows):
     # except for the deliberately unblinded oracle judge (risk = 1 - IoU).
     if objective=="oracle_iou":measurement_utility=mean
     else:measurement_utility=float(np.mean([np.mean([utility(r) for r in members]) for members in grouped.values()]))
-    return dict(mean_iou=mean,loss_total=1-measurement_utility,research_utility=measurement_utility,
+    summary=dict(mean_iou=mean,loss_total=1-measurement_utility,research_utility=measurement_utility,
         legal_rate=float(np.mean([r["status"]=="succeeded" for r in rows])),
         parent_count=len(grouped),solve_count=len(rows),
         failed_solves=sum(r["status"]!="succeeded" for r in rows),
         mean_solver_wall_seconds=float(np.mean([r["solver_wall_seconds"] for r in rows])))
+    if objective!="oracle_iou" and any(
+            r["status"]=="succeeded" and "full_confirmation_loss_total" in r["metrics"] for r in rows):
+        def full_utility(row):
+            if row["status"]!="succeeded":return 0.
+            loss=row["metrics"].get("full_confirmation_loss_total")
+            if not isinstance(loss,(int,float)) or not np.isfinite(loss) or loss<0:
+                raise ValueError("full confirmation objective is missing or invalid")
+            return 1./(1.+loss)
+        summary["full_loss_total"]=1.-float(np.mean([np.mean([full_utility(r) for r in members]) for members in grouped.values()]))
+    return summary
 
 
 def release_record(path,stage):
@@ -160,8 +267,15 @@ def load_manifest(path,packs_per_body=None):
             location=(path.parent/row[name]).resolve()
             if not location.is_relative_to(path.parent):raise ValueError("suite path escapes dataset root")
         expected={"problem.json","problem.npz","truth.npy"}
-        if manifest["stage"]=="formal" or any(k.startswith('confirmation/') for k in row['sha256']):
-            expected|={"confirmation/problem.json","confirmation/problem.npz"}
+        conf_keys={k for k in row["sha256"] if k.startswith("confirmation/")}
+        if manifest["stage"]=="formal" and not conf_keys:raise ValueError("missing dataset digests")
+        if conf_keys:
+            if {"confirmation/problem.json","confirmation/problem.npz"} & conf_keys:
+                expected|={"confirmation/problem.json","confirmation/problem.npz"}
+            packs=sorted({k.split("/")[1] for k in conf_keys if len(k.split("/"))==3})
+            for pack in packs:
+                if _PACK.fullmatch(pack) is None:raise ValueError("invalid confirmation pack name")
+                expected|={f"confirmation/{pack}/problem.json",f"confirmation/{pack}/problem.npz"}
         if set(row["sha256"])!=expected:raise ValueError("missing dataset digests")
         for filename in expected:
             folder=row["truth"] if filename=="truth.npy" or filename.startswith("confirmation/") else row["public"]
@@ -197,18 +311,25 @@ class SuiteEvaluator:
     case_workers=4
 
     def __init__(self,root,execution,manifest_path,seconds=120,slots=None,objective="confirmation",purpose=None,
-                 *,anonymize_cases=False,canonical_origin=False):
-        if type(anonymize_cases) is not bool or type(canonical_origin) is not bool:
+                 *,anonymize_cases=False,canonical_origin=False,randomize_orientation=False,
+                 resample=None,confirmation_packs=None):
+        if any(type(v) is not bool for v in (anonymize_cases,canonical_origin,randomize_orientation)):
             raise ValueError("invalid case isolation flags")
         self.root=Path(root);self.execution=execution
         self.slots=slots
         self.manifest_path=Path(manifest_path).resolve()
         self.manifest=load_manifest(self.manifest_path)
-        if any('confirmation/problem.npz' not in case['sha256'] for case in self.manifest['cases']):
+        if any('confirmation/problem.npz' not in case['sha256'] and 'confirmation/c0/problem.npz' not in case['sha256']
+               for case in self.manifest['cases']):
             raise ValueError('independent confirmation measurements required for evaluation')
         if objective not in OBJECTIVES:raise ValueError("unknown evaluation objective")
+        self.resample=validate_resample(resample)
+        self.confirmation_packs=validate_confirmation_packs(confirmation_packs)
+        if (self.resample is not None or self.confirmation_packs is not None) and objective!="confirmation":
+            raise ValueError("confirmation resample and packs require confirmation objective")
         self.seconds=seconds;self.objective=objective
         self.anonymize_cases=anonymize_cases;self.canonical_origin=canonical_origin
+        self.randomize_orientation=randomize_orientation
         release,tiers=release_tiers(self.manifest_path,self.manifest["stage"])
         if purpose not in (None,"q1"):raise ValueError("unknown evaluation purpose")
         if purpose=="q1":
@@ -226,6 +347,10 @@ class SuiteEvaluator:
         if purpose is not None:self.context["purpose"]=purpose
         if anonymize_cases:self.context["anonymize_cases"]=True
         if canonical_origin:self.context["canonical_origin"]=True
+        if randomize_orientation:self.context["randomize_orientation"]=True
+        if self.resample is not None:self.context["resample"]=dict(self.resample)
+        if self.confirmation_packs is not None:
+            self.context["confirmation_packs"]=list(self.confirmation_packs) if isinstance(self.confirmation_packs,list) else self.confirmation_packs
 
     def evaluation_attempt_usage_key(self,candidate):
         return digest(dict(context=self.context,source=candidate.canonical_key))
@@ -251,9 +376,11 @@ class SuiteEvaluator:
             if row_path.exists():return json.loads(row_path.read_text())
             inputs=case_root/"input"
             raw_problem=read_problem(self.manifest_path.parent/case["public"])
-            if self.anonymize_cases or self.canonical_origin:
+            orientation=case_orientation(key,case["case_id"]) if self.randomize_orientation else 0
+            if self.anonymize_cases or self.canonical_origin or orientation:
                 cid=opaque_case_id(key,case["case_id"]) if self.anonymize_cases else None
-                problem=canonical_problem(raw_problem,case_id=cid,canonical_origin=self.canonical_origin)
+                problem=canonical_problem(raw_problem,case_id=cid,canonical_origin=self.canonical_origin,
+                                          orientation=orientation)
                 save_problem(problem,inputs)
                 score_inputs=case_root/"score-input"
                 save_problem(raw_problem,score_inputs)
@@ -272,17 +399,47 @@ class SuiteEvaluator:
             if not (r["exit_code"] or r["reason"] or r["oom"]):
                 try:
                     try:
-                        read_model(job/"output/model.npy",problem["shape"])
+                        field=read_model(job/"output/model.npy",problem["shape"])
                     except (FileNotFoundError,PermissionError) as exc:
                         raise ValueError("candidate did not produce a readable model") from exc
-                    sha=freeze_model(job/"output/model.npy",case_root/"model",problem["shape"])
+                    if orientation:
+                        restored_path=case_root/"restored-model.npy"
+                        np.save(restored_path,invert_orientation(field,orientation))
+                        try:
+                            sha=freeze_model(restored_path,case_root/"model",raw_problem["shape"])
+                        finally:
+                            restored_path.unlink(missing_ok=True)
+                    else:
+                        sha=freeze_model(job/"output/model.npy",case_root/"model",problem["shape"])
                 except OSError as exc:
                     raise EvaluationPaused("model freeze infrastructure I/O failed") from exc
                 except ValueError as exc:
                     row.update(status="invalid",error=str(exc))
                 else:
+                    raw_truth=self.manifest_path.parent/case["truth"]
+                    if (self.resample is not None or self.confirmation_packs is not None
+                            or not (raw_truth/"confirmation/problem.json").is_file()):
+                        score_truth=case_root/"score-truth"
+                        score_truth.mkdir(parents=True,exist_ok=True)
+                        truth_dst=score_truth/"truth.npy"
+                        if not truth_dst.exists():
+                            try:os.link(raw_truth/"truth.npy",truth_dst)
+                            except OSError:shutil.copy2(raw_truth/"truth.npy",truth_dst)
+                        base_conf=_load_confirmation(raw_truth,self.confirmation_packs)
+                        if self.resample is not None:
+                            from ..experiments.rsi.measurements import thin_confirmation
+                            rseed=confirmation_resample_seed(key,case["case_id"])
+                            thinned,_=thin_confirmation(base_conf,rseed,self.resample["fraction"],
+                                                        self.resample.get("outcrop_grid",4))
+                            save_problem(thinned,score_truth/"confirmation")
+                            save_problem(base_conf,score_truth/"full_confirmation")
+                        else:
+                            save_problem(base_conf,score_truth/"confirmation")
+                        _chmod_readable(score_truth)
+                    else:
+                        score_truth=raw_truth
                     scoring=dict(identity=identity,model=sha,inputs=score_inputs,model_dir=case_root/"model",
-                        truth=self.manifest_path.parent/case["truth"],row_path=row_path)
+                        truth=score_truth,row_path=row_path)
                     if merged:return row,scoring
                     score_root,s=self.execution.run(dict(identity=identity,model=sha),phase="scorer",inputs=score_inputs,
                         model=case_root/"model",truth=scoring["truth"],timeout=30,science_module="v2")

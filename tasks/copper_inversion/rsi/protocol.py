@@ -28,7 +28,8 @@ RESOURCES = TASK / "resources"
 ANALYSIS = TASK / "experiments/rsi/analysis"
 TAGGER = ANALYSIS / "tagger.py"
 
-EXPERIMENTS = ("smoke", "rehearsal", "Q1", "M1", "E1", "E2", "E3", "X1", "F1")
+EXPERIMENTS = ("smoke", "rehearsal", "Q1", "M1", "E1", "E2", "E3", "X1", "F1",
+               "M0", "N25", "W25", "X4", "OR", "L40")
 DEVELOPMENT_EXPERIMENTS = ("smoke", "rehearsal")
 DEVELOPMENT_RELEASE = "rsi-dev"
 HASH_FIELDS = ("task_brief", "renderer", "tool", "implementation", "evaluator_image",
@@ -36,17 +37,30 @@ HASH_FIELDS = ("task_brief", "renderer", "tool", "implementation", "evaluator_im
 IMAGE_FIELDS = ("evaluator_image", "sidecar_image")
 LOOP_FIELDS = ("rounds", "branches", "proposals_per_branch", "batch", "reserved_per_branch",
                "reset_period", "finalists", "harness_seconds", "bash_calls")
+LOOP_PRESETS = {
+    "r1": {"rounds": 20, "branches": 4, "proposals_per_branch": 8, "batch": 16,
+           "reserved_per_branch": 1, "reset_period": 5, "finalists": 3,
+           "harness_seconds": 1800, "bash_calls": 8},
+    "r2": {"rounds": 20, "branches": 4, "proposals_per_branch": 4, "batch": 16,
+           "reserved_per_branch": 4, "reset_period": 5, "finalists": 5,
+           "harness_seconds": 1800, "bash_calls": 8},
+}
 ARM_FIELDS = {"branches": None, "turns_per_round": None,
               "clear": ("never", "every_k", "every_round"),
               "boundary_payload": ("history", "best_program", "initial_program", "parents"),
               "round_feed": ("own", "all", "none"),
               "budget_split": ("shared", "separate")}
 OBJECTIVES = ("confirmation", "oracle_iou")
+OBJECTIVE_VERSIONS = ("objective_v2", "objective_v3")
+VALIDATION_JUDGES = ("standard", "match_training")
+JUDGE_FIELDS = frozenset({"objective", "objective_version", "train_manifest", "validation_manifest",
+                          "resample", "confirmation_packs"})
 THINKING = ("off", "minimal", "low", "medium", "high", "xhigh", "max")
 REQUIRED = {"protocol_version", "release", "tiers", "layout", "judges", "loop", "model",
             "token_cap_input", "arms", "seeds", "hashes", "decisions"}
 _HEX = re.compile(r"[0-9a-f]{64}")
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
+_PACK = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}")
 
 
 def canonical(value):
@@ -208,6 +222,16 @@ def validate(protocol):
         _int(loop[name], "loop." + name, 0 if name == "bash_calls" else 1)
     if not loop["branches"] * loop["reserved_per_branch"] <= loop["batch"] <= loop["branches"] * loop["proposals_per_branch"]:
         _fail("loop.batch must cover the reserved slots and fit the proposal pool")
+    if "loop_preset" in protocol:
+        preset = protocol["loop_preset"]
+        if preset not in LOOP_PRESETS:
+            _fail(f"loop_preset must be one of {tuple(LOOP_PRESETS)}")
+        if {k: loop[k] for k in LOOP_FIELDS} != LOOP_PRESETS[preset]:
+            _fail(f"loop fields differ from loop_preset {preset!r}")
+    if "objective_version" in protocol and protocol["objective_version"] not in OBJECTIVE_VERSIONS:
+        _fail(f"objective_version must be one of {OBJECTIVE_VERSIONS}")
+    if "validation_judge" in protocol and protocol["validation_judge"] not in VALIDATION_JUDGES:
+        _fail(f"validation_judge must be one of {VALIDATION_JUDGES}")
     slots = 1 + loop["rounds"] * loop["batch"]
 
     if "tiers" in protocol:
@@ -243,15 +267,40 @@ def validate(protocol):
         _int(count, "layout.sealed_bodies." + name)
 
     for name, judge in _dict(protocol["judges"], "judges").items():
-        if not isinstance(judge, dict) or judge.get("objective") not in OBJECTIVES:
+        if not isinstance(judge, dict) or set(judge) - JUDGE_FIELDS or judge.get("objective") not in OBJECTIVES:
             _fail(f"judges.{name}.objective must be one of {OBJECTIVES}")
         if (judge["objective"] == "oracle_iou") != (name == "oracle"):
             _fail("only the judge named oracle may, and must, score oracle_iou")
+        if "objective_version" in judge and judge["objective_version"] not in OBJECTIVE_VERSIONS:
+            _fail(f"judges.{name}.objective_version must be one of {OBJECTIVE_VERSIONS}")
         for key in ("train_manifest", "validation_manifest"):
             if key in judge:
                 _relative(judge[key], f"judges.{name}.{key}")
+        if "resample" in judge:
+            if judge["objective"] != "confirmation":
+                _fail(f"judges.{name}.resample requires objective='confirmation'")
+            spec = judge["resample"]
+            if not isinstance(spec, dict) or not {"fraction"} <= set(spec) <= {"fraction", "outcrop_grid"}:
+                _fail(f"judges.{name}.resample requires fraction (optional outcrop_grid)")
+            frac = _number(spec["fraction"], f"judges.{name}.resample.fraction")
+            if not 0 < frac < 1:
+                _fail(f"judges.{name}.resample.fraction must lie in (0, 1)")
+            if "outcrop_grid" in spec:
+                _int(spec["outcrop_grid"], f"judges.{name}.resample.outcrop_grid")
+        if "confirmation_packs" in judge:
+            if judge["objective"] != "confirmation":
+                _fail(f"judges.{name}.confirmation_packs requires objective='confirmation'")
+            packs = judge["confirmation_packs"]
+            if packs != "all" and (not isinstance(packs, list) or not packs or len(set(packs)) != len(packs)
+                                   or any(not isinstance(p, str) or _PACK.fullmatch(p) is None for p in packs)):
+                _fail(f"judges.{name}.confirmation_packs must be 'all' or a list of distinct pack names")
     if "standard" not in protocol["judges"]:
         _fail("judges must define standard")
+    if validation_judge(protocol) == "standard":
+        std_val = protocol["judges"]["standard"].get("validation_manifest")
+        for name, judge in protocol["judges"].items():
+            if name != "standard" and "validation_manifest" in judge and judge["validation_manifest"] != std_val:
+                _fail(f"judges.{name}.validation_manifest is not allowed when validation_judge='standard'")
 
     model = protocol["model"]
     if not isinstance(model, dict) or not {"base_url", "name", "thinking"} <= set(model):
@@ -332,6 +381,32 @@ def case_isolation(protocol):
     if "case_isolation" in protocol:
         return validate_case_isolation(protocol["case_isolation"])
     return dict(LEGACY_CASE_ISOLATION)
+
+
+def validation_judge(protocol):
+    """'standard' fixes validation to the standard judge in every cell; 'match_training' keeps legacy rsi-r1."""
+    if "validation_judge" in protocol:
+        return protocol["validation_judge"]
+    judges = protocol.get("judges") or {}
+    if (protocol.get("objective_version") == "objective_v3"
+            or any(isinstance(j, dict) and ("resample" in j or "confirmation_packs" in j) for j in judges.values())
+            or bool({"noisy25", "x4", "w25"} & set(judges))):
+        return "standard"
+    return "match_training"
+
+
+def objective_version(protocol, judge_name=None):
+    if judge_name is not None and judge_name in (protocol.get("judges") or {}):
+        ver = protocol["judges"][judge_name].get("objective_version")
+        if ver is not None:
+            return ver
+    return protocol.get("objective_version", "objective_v2")
+
+
+def loop_preset(name):
+    if name not in LOOP_PRESETS:
+        raise ValueError(f"unknown loop preset {name!r}")
+    return dict(LOOP_PRESETS[name])
 
 
 # Component hashes -----------------------------------------------------------

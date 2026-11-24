@@ -84,7 +84,7 @@ def parse_args(argv=None):
 
 
 def run_id(experiment, arm, judge, seed):
-    return f"{arm}-{judge}-s{seed}" if experiment == "E3" else f"{arm}-s{seed}"
+    return f"{arm}-{judge}-s{seed}" if experiment == "E3" or judge != "standard" else f"{arm}-s{seed}"
 
 
 def continuation_run_id(source_seed, mode, replicate, planted=False):
@@ -184,7 +184,7 @@ def prepare(args):
         raise ValueError("arm is not defined by the protocol")
     if args.judge not in protocol["judges"]:
         raise ValueError("judge is not defined by the protocol")
-    if args.judge != "standard" and args.experiment not in ("E3",) + protocols.DEVELOPMENT_EXPERIMENTS:
+    if args.judge != "standard" and args.experiment not in ("E3", "N25", "W25", "X4", "OR") + protocols.DEVELOPMENT_EXPERIMENTS:
         raise ValueError("judge strength varies only in E3")
     allowed = protocol["seeds"].get(args.experiment)
     if allowed is not None and args.seed not in allowed + protocol["seeds"].get(args.experiment + "_reserve", []):
@@ -349,8 +349,15 @@ def main(argv=None):
         else:
             result = controller.run(resume=args.resume)
         sealed = client.seal_training()
-        if (sealed["used_slots"] != result["charged_records"]
-                or sealed["source_sha256s"] != result["training_finalists"]):
+        resampled = "resample" in protocol["judges"][args.judge]
+        if sealed["used_slots"] != result["charged_records"]:
+            raise ValueError("public and private training records or finalists differ")
+        if resampled:
+            from .ledger import read as read_ledger
+            valid_ids = {r["program_id"] for r in read_ledger(args.out_dir / "ledger.jsonl") if r["status"] == "valid"}
+            if not set(sealed["source_sha256s"]) <= valid_ids:
+                raise ValueError("public and private training records or finalists differ")
+        elif sealed["source_sha256s"] != result["training_finalists"]:
             raise ValueError("public and private training records or finalists differ")
     except Exception as exc:
         reason = _provider_pause_reason(exc)

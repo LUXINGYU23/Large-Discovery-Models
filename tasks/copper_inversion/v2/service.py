@@ -62,7 +62,9 @@ def resolve_tier(configuration,manifest):
 
 class EvaluatorService:
     configuration_keys=frozenset({"manifest","root","image","seconds","slots","caller_uid","socket"})
-    optional_keys=frozenset({"tier","objective","purpose","anonymize_cases","canonical_origin"})
+    optional_keys=frozenset({"tier","objective","purpose","anonymize_cases","canonical_origin","randomize_orientation",
+                             "resample","confirmation_packs","finalists"})
+    finalists=3
 
     def __init__(self,configuration):
         if not isinstance(configuration,dict) or not (
@@ -72,8 +74,12 @@ class EvaluatorService:
         if self.objective not in OBJECTIVES:raise ValueError("unknown evaluation objective")
         anonymize_cases=configuration.get("anonymize_cases",False)
         canonical_origin=configuration.get("canonical_origin",False)
-        if type(anonymize_cases) is not bool or type(canonical_origin) is not bool:
+        randomize_orientation=configuration.get("randomize_orientation",False)
+        if any(type(v) is not bool for v in (anonymize_cases,canonical_origin,randomize_orientation)):
             raise ValueError("invalid case isolation flags")
+        finalists=configuration.get("finalists",3)
+        if type(finalists) is not int or finalists<1:raise ValueError("invalid finalist count")
+        self.finalists=finalists
         manifest=load_manifest(configuration["manifest"])
         if manifest["split"]!="train":raise ValueError("service accepts training only")
         if manifest["stage"]=="formal":
@@ -108,7 +114,9 @@ class EvaluatorService:
         self.domain=CheckedDomain(self.root,InterfaceChecks(self.root,execution,slots))
         self.evaluator=SuiteEvaluator(self.root,execution,configuration["manifest"],configuration["seconds"],slots,
             objective=self.objective,purpose=configuration.get("purpose"),
-            anonymize_cases=anonymize_cases,canonical_origin=canonical_origin)
+            anonymize_cases=anonymize_cases,canonical_origin=canonical_origin,
+            randomize_orientation=randomize_orientation,
+            resample=configuration.get("resample"),confirmation_packs=configuration.get("confirmation_packs"))
 
     def dispatch(self,request):
         if not isinstance(request,dict):return {"status":"rejected_request"}
@@ -162,8 +170,9 @@ class EvaluatorService:
             if record["contract_digest"]!=digest(self.identity):raise ValueError("sealed contract differs")
         else:
             records=eligible(self.root,self.manifest_path)
-            ordered=sorted(records,key=lambda sha:(records[sha]["metrics"]["loss_total"],
-                -records[sha]["metrics"]["legal_rate"],records[sha]["metrics"]["mean_solver_wall_seconds"],sha))[:3]
+            ordered=sorted(records,key=lambda sha:(
+                records[sha]["metrics"].get("full_loss_total",records[sha]["metrics"]["loss_total"]),
+                -records[sha]["metrics"]["legal_rate"],records[sha]["metrics"]["mean_solver_wall_seconds"],sha))[:self.finalists]
             record=dict(contract_digest=digest(self.identity),
                 used_slots=self.ledger.counters.get("algorithm_feedback_slots",0),
                 source_sha256s=ordered,

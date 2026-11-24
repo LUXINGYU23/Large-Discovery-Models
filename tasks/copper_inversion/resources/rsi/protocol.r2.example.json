@@ -1,0 +1,375 @@
+{
+  "analysis": {
+    "checkpoint_experiment": "M1",
+    "checkpoint_round": 10,
+    "freeze_prefixes": {
+      "E1": [
+        "full",
+        12,
+        14,
+        15,
+        16,
+        18
+      ],
+      "E2": [
+        "full"
+      ],
+      "E3": [
+        "full"
+      ],
+      "M1": [
+        "full",
+        5,
+        10
+      ],
+      "N25": [
+        "full"
+      ],
+      "OR": [
+        "full"
+      ],
+      "W25": [
+        "full"
+      ],
+      "X4": [
+        "full"
+      ]
+    },
+    "tagger": {
+      "cluster_reference": null,
+      "mode": "tags",
+      "rules": {
+        "rules": [
+          {
+            "description": "Fast marching, eikonal or travel-time front propagation.",
+            "name": "fast_marching",
+            "patterns": [
+              "fast_?march",
+              "\\bfmm\\b",
+              "skfmm",
+              "eikonal",
+              "travel_?time"
+            ],
+            "top_level": true
+          },
+          {
+            "description": "A temperature-dependent or Metropolis search loop.",
+            "name": "annealing",
+            "patterns": [
+              "anneal",
+              "temperature",
+              "\\btemp\\b",
+              "metropolis"
+            ],
+            "require_loop": true,
+            "top_level": true
+          },
+          {
+            "description": "Random sampling or search performed in a loop.",
+            "name": "random_search",
+            "patterns": [
+              "^(random|rand|randn|uniform|normal|choice|integers|default_rng)$"
+            ],
+            "require_loop": true,
+            "top_level": true
+          },
+          {
+            "description": "Implicit field construction or interpolation.",
+            "name": "implicit_interpolation",
+            "patterns": [
+              "rbf",
+              "griddata",
+              "krig",
+              "\\bidw\\b",
+              "interpolat",
+              "implicit"
+            ],
+            "top_level": true
+          },
+          {
+            "description": "A linear, least-squares or numerical optimization call.",
+            "name": "convex_optimization",
+            "patterns": [
+              "^(linprog|lsq_linear|nnls|lstsq|least_squares|minimize|cvxpy|quadprog)$"
+            ],
+            "top_level": true
+          },
+          {
+            "description": "Signed distance or level-set geometry.",
+            "name": "level_set",
+            "patterns": [
+              "distance_transform",
+              "signed_distance",
+              "level_?set",
+              "\\bsdf\\b"
+            ],
+            "top_level": true
+          },
+          {
+            "description": "Morphological postprocessing of a binary volume.",
+            "name": "morphology",
+            "patterns": [
+              "binary_(closing|opening|dilation|erosion|fill_holes)",
+              "morpholog",
+              "^label$"
+            ],
+            "top_level": false
+          }
+        ],
+        "version": "draft-v0"
+      }
+    }
+  },
+  "arms": {
+    "accumulated": {
+      "boundary_payload": "history",
+      "branches": 4,
+      "budget_split": "shared",
+      "clear": "never",
+      "round_feed": "own",
+      "turns_per_round": 1
+    },
+    "independent_sampling": {
+      "boundary_payload": "initial_program",
+      "branches": 4,
+      "budget_split": "shared",
+      "clear": "every_round",
+      "round_feed": "none",
+      "turns_per_round": 1
+    },
+    "ldm4geo": {
+      "boundary_payload": "history",
+      "branches": 4,
+      "budget_split": "shared",
+      "clear": "every_k",
+      "round_feed": "own",
+      "turns_per_round": 1
+    },
+    "program_evolution": {
+      "boundary_payload": "parents",
+      "branches": 4,
+      "budget_split": "shared",
+      "clear": "every_round",
+      "round_feed": "none",
+      "turns_per_round": 1
+    },
+    "restart_best": {
+      "boundary_payload": "best_program",
+      "branches": 4,
+      "budget_split": "shared",
+      "clear": "every_k",
+      "round_feed": "own",
+      "turns_per_round": 1
+    },
+    "separate_runs": {
+      "boundary_payload": "history",
+      "branches": 4,
+      "budget_split": "separate",
+      "clear": "every_k",
+      "round_feed": "own",
+      "turns_per_round": 1
+    },
+    "single_conversation": {
+      "boundary_payload": "history",
+      "branches": 1,
+      "budget_split": "shared",
+      "clear": "never",
+      "round_feed": "all",
+      "turns_per_round": 4
+    }
+  },
+  "case_isolation": {
+    "anonymize_cases": true,
+    "canonical_origin": true,
+    "case_feedback": "none",
+    "randomize_orientation": true,
+    "refuse_case_ids": true
+  },
+  "decisions": {
+    "e1_margin": "s0",
+    "mde_bound_relative": 0.2,
+    "primary_hypothesis": "superiority",
+    "q1_spearman_min": 0.8
+  },
+  "hashes": {
+    "analysis": null,
+    "embedding_model": null,
+    "evaluator_image": null,
+    "implementation": null,
+    "renderer": null,
+    "sidecar_image": null,
+    "tagger": null,
+    "task_brief": null,
+    "tool": null
+  },
+  "judges": {
+    "noisy25": {
+      "objective": "confirmation",
+      "resample": {
+        "fraction": 0.25
+      }
+    },
+    "oracle": {
+      "objective": "oracle_iou"
+    },
+    "standard": {
+      "objective": "confirmation"
+    },
+    "w25": {
+      "objective": "confirmation",
+      "train_manifest": "train_s_w25/manifest.json"
+    },
+    "x4": {
+      "confirmation_packs": [
+        "c0",
+        "c1",
+        "c2",
+        "c3"
+      ],
+      "objective": "confirmation"
+    }
+  },
+  "layout": {
+    "assignment_rule": "alternate-within-family-v1",
+    "execution_seeds": [
+      47
+    ],
+    "packs_per_body": 1,
+    "sealed_bodies": {
+      "test_id": 48,
+      "test_ood": 24
+    }
+  },
+  "loop": {
+    "bash_calls": 8,
+    "batch": 16,
+    "branches": 4,
+    "finalists": 5,
+    "harness_seconds": 1800,
+    "proposals_per_branch": 4,
+    "reserved_per_branch": 4,
+    "reset_period": 5,
+    "rounds": 20
+  },
+  "loop_preset": "r2",
+  "model": {
+    "base_url": "https://api.deepseek.com",
+    "name": "deepseek-flash",
+    "thinking": "low"
+  },
+  "objective_version": "objective_v3",
+  "protocol_version": 1,
+  "release": {
+    "name": "rsi-r2",
+    "qualification_sha256": null
+  },
+  "seeds": {
+    "E3": [
+      201,
+      202,
+      203,
+      204,
+      205,
+      206,
+      207,
+      208
+    ],
+    "M1": [
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      111,
+      112
+    ],
+    "M1_reserve": [
+      113,
+      114,
+      115,
+      116
+    ],
+    "N25": [
+      301,
+      302,
+      303,
+      304,
+      305,
+      306,
+      307,
+      308
+    ],
+    "OR": [
+      401,
+      402,
+      403,
+      404,
+      405,
+      406,
+      407,
+      408
+    ],
+    "W25": [
+      501,
+      502,
+      503,
+      504,
+      505,
+      506,
+      507,
+      508
+    ],
+    "X4": [
+      601,
+      602,
+      603,
+      604,
+      605,
+      606,
+      607,
+      608
+    ]
+  },
+  "tiers": {
+    "F": {
+      "sealed_manifests": [
+        "test_id/manifest.json",
+        "test_ood/manifest.json"
+      ],
+      "slots": 321,
+      "solver_seconds": 120,
+      "train_bodies": 48,
+      "train_manifest": "train/manifest.json",
+      "validation_manifest": "validation/manifest.json"
+    },
+    "M": {
+      "sealed_manifests": [
+        "test_id/manifest.json",
+        "test_ood/manifest.json"
+      ],
+      "slots": 321,
+      "solver_seconds": 60,
+      "train_bodies": 24,
+      "train_manifest": "train_m/manifest.json",
+      "validation_manifest": "validation/manifest.json"
+    },
+    "S": {
+      "sealed_manifests": [
+        "test_id/manifest.json",
+        "test_ood/manifest.json"
+      ],
+      "slots": 321,
+      "solver_seconds": 30,
+      "train_bodies": 12,
+      "train_manifest": "train_s/manifest.json",
+      "validation_manifest": "validation/manifest.json"
+    }
+  },
+  "token_cap_input": 200000000,
+  "validation_judge": "standard"
+}

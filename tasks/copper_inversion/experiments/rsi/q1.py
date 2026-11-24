@@ -86,7 +86,7 @@ def release_config(release):
 
 
 def evaluate_sources(service_root, manifest, seconds, slots, image, sources, *, tier=None, purpose=None, policy=None,
-                     anonymize_cases=False, canonical_origin=False):
+                     anonymize_cases=False, canonical_origin=False, randomize_orientation=False):
     """Submit pinned sources to the v2 training service in the trusted process."""
     root, manifest = Path(service_root).resolve(), Path(manifest).resolve()
     if load_manifest(manifest)["split"] != "train":
@@ -101,6 +101,8 @@ def evaluate_sources(service_root, manifest, seconds, slots, image, sources, *, 
         config["anonymize_cases"] = True
     if canonical_origin:
         config["canonical_origin"] = True
+    if randomize_orientation:
+        config["randomize_orientation"] = True
     if policy is None:
         service = EvaluatorService(config)
     else:
@@ -125,7 +127,8 @@ def evaluate_sources(service_root, manifest, seconds, slots, image, sources, *, 
     return root
 
 
-def evaluate(selection_path, release, output, image, *, policy=None, anonymize_cases=False, canonical_origin=False):
+def evaluate(selection_path, release, output, image, *, policy=None, anonymize_cases=False, canonical_origin=False,
+             randomize_orientation=False):
     selection_path = Path(selection_path)
     chosen = json.loads(selection_path.read_text())
     if chosen.get("schema") != "rsi-q1-selection-v1":
@@ -163,6 +166,8 @@ def evaluate(selection_path, release, output, image, *, policy=None, anonymize_c
             identity["anonymize_cases"] = True
         if canonical_origin:
             identity["canonical_origin"] = True
+        if randomize_orientation:
+            identity["randomize_orientation"] = True
         identity_path = root_path / "q1-layout.json"
         if identity_path.exists() and json.loads(identity_path.read_text()) != identity:
             raise ValueError("Q1 layout identity changed")
@@ -174,6 +179,8 @@ def evaluate(selection_path, release, output, image, *, policy=None, anonymize_c
             kwargs["anonymize_cases"] = True
         if canonical_origin:
             kwargs["canonical_origin"] = True
+        if randomize_orientation:
+            kwargs["randomize_orientation"] = True
         if policy is not None:
             kwargs["policy"] = policy
         root = evaluate_sources(root_path, release / manifest, seconds, slots, image, entries, **kwargs)
@@ -185,7 +192,8 @@ def evaluate(selection_path, release, output, image, *, policy=None, anonymize_c
     return mapping
 
 
-def build_references(refs_path, release, output, image, *, policy=None, anonymize_cases=False, canonical_origin=False):
+def build_references(refs_path, release, output, image, *, policy=None, anonymize_cases=False, canonical_origin=False,
+                     randomize_orientation=False):
     refs = references(refs_path)
     release, record = release_config(release)
     tier = record["tiers"]["S"]
@@ -197,6 +205,8 @@ def build_references(refs_path, release, output, image, *, policy=None, anonymiz
         kwargs["anonymize_cases"] = True
     if canonical_origin:
         kwargs["canonical_origin"] = True
+    if randomize_orientation:
+        kwargs["randomize_orientation"] = True
     if policy is not None:
         kwargs["policy"] = policy
     service = evaluate_sources(output / "training", release / tier["train_manifest"], tier["solver_seconds"],
@@ -211,6 +221,8 @@ def build_references(refs_path, release, output, image, *, policy=None, anonymiz
                 freeze_opts["anonymize_cases"] = True
             if canonical_origin:
                 freeze_opts["canonical_origin"] = True
+            if randomize_orientation:
+                freeze_opts["randomize_orientation"] = True
             selection.freeze(target, [ref["source"]], release / tier["validation_manifest"],
                              [release / p for p in tier["sealed_manifests"]], seconds=tier["solver_seconds"],
                              image=image, training_run=service, training_manifest=release / tier["train_manifest"],
@@ -256,11 +268,12 @@ def main(argv=None, *, policy=None):
     if args.command == "select":
         print(select(args.runs, args.output, args.seed))
     else:
-        isolation = {"anonymize_cases": False, "canonical_origin": False}
+        isolation = {"anonymize_cases": False, "canonical_origin": False, "randomize_orientation": False}
         if args.protocol is not None:
             from tasks.copper_inversion.rsi import protocol as protocols
             isolation = protocols.case_isolation(protocols.load(args.protocol))
-        flags = dict(anonymize_cases=isolation["anonymize_cases"], canonical_origin=isolation["canonical_origin"])
+        flags = dict(anonymize_cases=isolation["anonymize_cases"], canonical_origin=isolation["canonical_origin"],
+                     randomize_orientation=isolation["randomize_orientation"])
         if args.command == "evaluate":
             print(json.dumps(evaluate(args.selection, args.release, args.output, args.image, policy=policy, **flags), sort_keys=True))
         else:

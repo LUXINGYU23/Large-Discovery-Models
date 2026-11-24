@@ -443,10 +443,18 @@ class Launcher:
             sockets.mkdir(parents=True, mode=0o750)
             self.host.chown(sockets, uid, client_gid)
             tier = self.protocol["tiers"][self.tier]
+            judge = self.protocol["judges"][run["judge"]]
             config = {"manifest": str(self.manifest_path(run).resolve()), "root": str(private),
                       "image": self.site["image"], "seconds": tier["solver_seconds"], "slots": tier["slots"],
                       "caller_uid": client_uid, "socket": str(socket_path),
-                      "objective": self.protocol["judges"][run["judge"]]["objective"], "tier": self.tier}
+                      "objective": judge["objective"], "tier": self.tier}
+            if "resample" in judge:
+                config["resample"] = dict(judge["resample"])
+            if "confirmation_packs" in judge:
+                packs = judge["confirmation_packs"]
+                config["confirmation_packs"] = list(packs) if isinstance(packs, list) else packs
+            if self.protocol["loop"]["finalists"] != 3:
+                config["finalists"] = self.protocol["loop"]["finalists"]
             if "case_isolation" in self.protocol:
                 config["case_isolation"] = protocols.case_isolation(self.protocol)
             if "continuation" in run:

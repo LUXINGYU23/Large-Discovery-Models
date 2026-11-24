@@ -6,10 +6,16 @@ parent identity, or dataset file hash leaves the private side.
 
 Extra blocks read by the analysis package (analysis/outcomes.py):
   programs, validations  aggregates from private receipts (also validation-only)
+  diagnostics            per-run aggregate diagnostics (effort per turn, surrogate
+                         rank skill, training risk/IoU Spearman overall and best
+                         quartile, boundary-round vs other-round risk)
   body_scores            sealed IoU per body in one anonymous order, sorted by the
                          private parent id, which is never written. A scoped,
                          coordinator-approved exception to AT-31 for the body-paired
                          bootstrap of spec §7; written only after the unseal.
+  strata_slices          sealed parent-macro IoU sliced by family, modality and
+                         noise (written only after the unseal; strata with fewer
+                         than MIN_PARENTS parents are omitted as null).
   q1, references         per-program training risks and logged reference outcomes.
 """
 
@@ -17,6 +23,8 @@ import argparse
 import csv
 import io
 import json
+import math
+import re
 from pathlib import Path
 
 import numpy as np
@@ -146,6 +154,260 @@ def programs(service_root):
     return {sha: r["metrics"]["mean_iou"] for sha, r in eligible(service_root, manifest).items()}, manifest
 
 
+STRATA_AXES = ("family", "modality", "noise")
+_ROUND_FILE = re.compile(r"round_(\d+)\.json")
+
+
+def _spearman(x, y):
+    from scipy.stats import rankdata
+    x, y = np.asarray(x, float), np.asarray(y, float)
+    if len(x) < 3 or np.ptp(x) == 0 or np.ptp(y) == 0:
+        return None
+    value = float(np.corrcoef(rankdata(x), rankdata(y))[0, 1])
+    return value if math.isfinite(value) else None
+
+
+def _normalize_noise(value):
+    if type(value) is bool:
+        return "noisy" if value else "clean"
+    if isinstance(value, str):
+        low = value.strip().lower()
+        if low in ("noisy", "true", "1"):
+            return "noisy"
+        if low in ("clean", "false", "0"):
+            return "clean"
+    return None
+
+
+def _apply_stratum_row(meta, by_parent, row):
+    if not isinstance(row, dict):
+        return
+    cids = []
+    cid = row.get("case_id")
+    if isinstance(cid, str) and cid in meta:
+        cids.append(cid)
+    pid = row.get("parent_id")
+    if isinstance(pid, str) and pid in by_parent:
+        cids.extend(c for c in by_parent[pid] if c not in cids)
+    if not cids:
+        return
+    family = row.get("family")
+    noise = _normalize_noise(row["noise"] if "noise" in row else row.get("noisy"))
+    for target in cids:
+        if isinstance(family, str) and family:
+            meta[target].setdefault("family", family)
+        if noise is not None:
+            meta[target].setdefault("noise", noise)
+
+
+def _case_strata(manifest_path, manifest):
+    """Resolve (family, modality, noise) per case from strata files, release layout evidence, or public inputs."""
+    manifest_path = Path(manifest_path).resolve()
+    release = manifest_path.parent.parent
+    meta, by_parent = {}, {}
+    for case in manifest["cases"]:
+        cid = case["case_id"]
+        meta[cid] = {"modality": case["modality"]}
+        by_parent.setdefault(case["parent_id"], []).append(cid)
+    for rel in ("strata.json", "evidence/strata.json", "private/strata.json"):
+        path = release / rel
+        if not path.is_file():
+            continue
+        data = json.loads(path.read_text())
+        if isinstance(data, dict) and isinstance(data.get("cases"), list):
+            for row in data["cases"]:
+                _apply_stratum_row(meta, by_parent, row)
+        elif isinstance(data, list):
+            for row in data:
+                _apply_stratum_row(meta, by_parent, row)
+        elif isinstance(data, dict):
+            for key, row in data.items():
+                if isinstance(row, dict):
+                    _apply_stratum_row(meta, by_parent, {"case_id": key, "parent_id": key, **row})
+    csv_path = release / "strata.csv"
+    if csv_path.is_file():
+        with csv_path.open(encoding="utf-8", newline="") as stream:
+            for row in csv.DictReader(stream):
+                _apply_stratum_row(meta, by_parent, row)
+    layout_path = release / "evidence/layout.json"
+    if layout_path.is_file():
+        assignment = json.loads(layout_path.read_text()).get("assignment", [])
+        if isinstance(assignment, list):
+            for row in assignment:
+                _apply_stratum_row(meta, by_parent, row)
+            if any("family" not in m or "noise" not in m for m in meta.values()):
+                split_rows = sorted((r for r in assignment if isinstance(r, dict) and r.get("split") == manifest["split"]),
+                                    key=lambda r: r.get("index", 0))
+                if (len(split_rows) == len(manifest["cases"])
+                        and all(r.get("selected_modality") == c["modality"] for r, c in zip(split_rows, manifest["cases"]))):
+                    for row, case in zip(split_rows, manifest["cases"]):
+                        entry = meta[case["case_id"]]
+                        if isinstance(row.get("family"), str) and row["family"]:
+                            entry.setdefault("family", row["family"])
+                        noise = _normalize_noise(row["noise"] if "noise" in row else row.get("noisy"))
+                        if noise is not None:
+                            entry.setdefault("noise", noise)
+    for case in manifest["cases"]:
+        entry = meta[case["case_id"]]
+        if "noise" not in entry:
+            prob_path = manifest_path.parent / case["public"] / "problem.json"
+            if prob_path.is_file():
+                prob = json.loads(prob_path.read_text())
+                noisy = any((o.get("label_error") or 0) > 0 for o in prob.get("observations", []))
+                entry["noise"] = "noisy" if noisy else "clean"
+    return meta
+
+
+def _strata_slices(item, work, manifest_path):
+    """Parent-macro sealed IoU sliced by family, modality and noise; strata < MIN_PARENTS become None."""
+    manifest = load_manifest(manifest_path)
+    strata = _case_strata(manifest_path, manifest)
+    out = {axis: {} for axis in STRATA_AXES}
+    if item.get("interface_rejected"):
+        for axis in STRATA_AXES:
+            levels = sorted({strata[c["case_id"]].get(axis) for c in manifest["cases"] if strata[c["case_id"]].get(axis)})
+            for level in levels:
+                parents = {c["parent_id"] for c in manifest["cases"] if strata[c["case_id"]].get(axis) == level}
+                out[axis][level] = 0.0 if len(parents) >= MIN_PARENTS else None
+        return out
+    cases = _rows(work)
+    for axis in STRATA_AXES:
+        levels = sorted({strata[r["case_id"]].get(axis) for r in cases if strata.get(r["case_id"], {}).get(axis)})
+        for level in levels:
+            subset = [r for r in cases if strata.get(r["case_id"], {}).get(axis) == level]
+            out[axis][level] = _parent_mean(subset, lambda r: r["metrics"]["iou"] if r["status"] == "succeeded" else 0.)
+    return out
+
+
+def _round_files(directory):
+    directory = Path(directory)
+    if not directory.is_dir():
+        return []
+    found = []
+    for path in sorted(directory.iterdir()):
+        match = _ROUND_FILE.fullmatch(path.name)
+        if match and path.is_file():
+            found.append((int(match.group(1)), path))
+    return sorted(found)
+
+
+def run_diagnostics(run_dir, trained):
+    """Aggregate-only per-run diagnostics: effort/turn, surrogate skill, best-quartile Spearman, boundary risk."""
+    run_dir = Path(run_dir)
+    manifest = json.loads((run_dir / "manifest.json").read_text())
+    config = manifest.get("config") or {}
+    reset_period = config.get("reset_period", 5)
+    if type(reset_period) is not int or reset_period < 1:
+        reset_period = 5
+    ledger_path = run_dir / "ledger.jsonl"
+    ledger = [json.loads(line) for line in ledger_path.read_text().splitlines() if line.strip()] if ledger_path.is_file() else []
+
+    out_tokens, requests, wall_seconds, compactions, fallback_tools = [], [], [], [], []
+    for _, path in _round_files(run_dir / "usage"):
+        by_profile = json.loads(path.read_text()).get("by_profile") or {}
+        for usage in by_profile.values():
+            if not isinstance(usage, dict):
+                continue
+            if isinstance(usage.get("output_tokens"), (int, float)):
+                out_tokens.append(float(usage["output_tokens"]))
+            if isinstance(usage.get("requests"), (int, float)):
+                requests.append(float(usage["requests"]))
+            if isinstance(usage.get("wall_seconds"), (int, float)):
+                wall_seconds.append(float(usage["wall_seconds"]))
+            if isinstance(usage.get("compactions"), (int, float)):
+                compactions.append(float(usage["compactions"]))
+            tc = usage.get("tool_calls")
+            if isinstance(tc, dict):
+                fallback_tools.append(float(sum(v for v in tc.values() if isinstance(v, (int, float)))))
+            elif isinstance(tc, (int, float)):
+                fallback_tools.append(float(tc))
+
+    tool_calls, bash_calls = [], []
+    for commit in sorted(run_dir.glob("harness/epoch_*/branch_*/turns/*/turn_committed.json")):
+        data = json.loads(commit.read_text())
+        tc = (data.get("usage") or {}).get("toolCalls")
+        if isinstance(tc, dict):
+            tool_calls.append(float(sum(v for v in tc.values() if isinstance(v, (int, float)))))
+            bash_calls.append(float(tc.get("bash", 0)))
+    if not tool_calls and fallback_tools:
+        tool_calls = fallback_tools
+
+    valid_by_round = {}
+    for row in ledger:
+        if row.get("status") == "valid":
+            valid_by_round.setdefault(row["round"], {})[row["program_id"]] = float(row["risk"])
+
+    round_skills, pooled_pred, pooled_real = [], [], []
+    for round_index, path in _round_files(run_dir / "selection"):
+        if round_index < 3:
+            continue
+        data = json.loads(path.read_text())
+        entries = data.get("predictions") or data.get("selected") or []
+        preds = {p["program_id"]: float(p["mean"]) for p in entries
+                 if isinstance(p, dict) and isinstance(p.get("mean"), (int, float)) and math.isfinite(p["mean"])}
+        realized = valid_by_round.get(round_index, {})
+        pairs = [(preds[pid], realized[pid]) for pid in sorted(realized) if pid in preds]
+        if pairs:
+            xs, ys = [a for a, _ in pairs], [b for _, b in pairs]
+            pooled_pred.extend(xs)
+            pooled_real.extend(ys)
+            rho = _spearman(xs, ys)
+            if rho is not None:
+                round_skills.append(rho)
+
+    train_pairs = [(float(r["risk"]), float(trained[r["program_id"]]))
+                   for r in ledger if r.get("status") == "valid" and r["program_id"] in trained]
+    if train_pairs:
+        t_risks = [x for x, _ in train_pairs]
+        t_ious = [y for _, y in train_pairs]
+        train_spearman = _spearman(t_risks, t_ious)
+        q25 = float(np.quantile(t_risks, 0.25))
+        top = [(x, y) for x, y in train_pairs if x <= q25]
+        best_q_spearman = _spearman([x for x, _ in top], [y for _, y in top])
+    else:
+        train_spearman, best_q_spearman, top = None, None, []
+
+    round1_risks = [float(r["risk"]) for r in ledger if r.get("status") == "valid" and r["round"] == 1]
+    boundary_risks = [float(r["risk"]) for r in ledger
+                      if r.get("status") == "valid" and r["round"] > 1 and (r["round"] - 1) % reset_period == 0]
+    other_risks = [float(r["risk"]) for r in ledger
+                   if r.get("status") == "valid" and r["round"] > 1 and (r["round"] - 1) % reset_period != 0]
+
+    mean_or_none = lambda xs: float(np.mean(xs)) if xs else None
+    median_or_none = lambda xs: float(np.median(xs)) if xs else None
+    return {
+        "run_id": manifest.get("run_id") or run_dir.name,
+        "arm": manifest.get("arm"),
+        "seed": manifest.get("seed"),
+        "judge": manifest.get("judge"),
+        "turns": len(out_tokens),
+        "output_tokens_per_turn": mean_or_none(out_tokens),
+        "requests_per_turn": mean_or_none(requests),
+        "wall_seconds_per_turn": mean_or_none(wall_seconds),
+        "compactions_per_turn": mean_or_none(compactions),
+        "tool_calls_turns": len(tool_calls),
+        "tool_calls_per_turn": mean_or_none(tool_calls),
+        "bash_calls_per_turn": mean_or_none(bash_calls),
+        "surrogate_rank_skill": mean_or_none(round_skills),
+        "surrogate_rank_skill_pooled": _spearman(pooled_pred, pooled_real),
+        "surrogate_rounds": len(round_skills),
+        "train_risk_iou_spearman": train_spearman,
+        "best_quartile_spearman": best_q_spearman,
+        "train_valid_programs": len(train_pairs),
+        "best_quartile_n": len(top),
+        "reset_period": reset_period,
+        "boundary_round_risk_mean": mean_or_none(boundary_risks),
+        "boundary_round_risk_median": median_or_none(boundary_risks),
+        "boundary_round_n": len(boundary_risks),
+        "other_round_risk_mean": mean_or_none(other_risks),
+        "other_round_risk_median": median_or_none(other_risks),
+        "other_round_n": len(other_risks),
+        "round1_risk_mean": mean_or_none(round1_risks),
+        "round1_risk_median": median_or_none(round1_risks),
+        "round1_n": len(round1_risks),
+    }
+
+
 def _forbidden(targets, manifests=()):
     tokens, paths = set(), set(map(str, manifests))
     for target in targets:
@@ -178,13 +440,21 @@ def export(root, protocol_id, experiment, *, validation_only=False):
         if completion["frozen_list_sha256"] != list_sha:
             raise ValueError("unseal completion record differs from its list")
     targets = check(root, listing)
-    rows, body_scores, orders, program_rows, validation_rows, manifests = [], [], {}, [], [], set()
+    rows, body_scores, strata_rows, orders, program_rows, validation_rows, diagnostic_rows, manifests = (
+        [], [], [], {}, [], [], [], set())
     for (run_id, prefix), target in sorted(targets.items()):
         run = run_manifest(layout(root, protocol_id, experiment, run_id)["run"], protocol_id, experiment)
         row, bodies = outcome(target, run, prefix, not validation_only)
-        if not validation_only and digest(json.loads((target / "test-result.json").read_text())) != \
-                completion["results_sha256"][f"{run_id}/{prefix}"]:
-            raise ValueError("sealed result differs from the unseal record")
+        if not validation_only:
+            result = json.loads((target / "test-result.json").read_text())
+            if digest(result) != completion["results_sha256"][f"{run_id}/{prefix}"]:
+                raise ValueError("sealed result differs from the unseal record")
+            frozen = json.loads((target / "frozen.json").read_text())
+            sha = result["selected_sha256"]
+            for index, split in enumerate(SPLITS, start=1):
+                item = next(r for r in result["results"] if r["split"] == split)
+                slices = _strata_slices(item, target / "test" / sha / split, frozen["manifests"][index]["path"])
+                strata_rows.append({"run_id": run_id, "prefix": prefix, "split": split, **slices})
         rows.append({column: row[column] for column in COLUMNS})
         for split, (manifest_sha, values) in sorted(bodies.items()):
             # One body order per split for the whole table: every run must use the same suite.
@@ -192,17 +462,21 @@ def export(root, protocol_id, experiment, *, validation_only=False):
                 raise ValueError("runs of one table were sealed on different body suites")
             body_scores.append({"run_id": run_id, "prefix": prefix, "split": split, "iou": values})
     for run_id in sorted({run_id for run_id, _ in targets}):
-        trained, manifest = programs(layout(root, protocol_id, experiment, run_id)["service"])
+        run_paths = layout(root, protocol_id, experiment, run_id)
+        trained, manifest = programs(run_paths["service"])
         manifests.add(manifest)
         program_rows += [{"run_id": run_id, "program_id": sha, "train_iou": v} for sha, v in sorted(trained.items())]
         validated = validations(t for (r, _), t in sorted(targets.items()) if r == run_id)
         validation_rows += [{"run_id": run_id, "program_id": sha, **v} for sha, v in sorted(validated.items())]
+        diagnostic_rows.append(run_diagnostics(run_paths["run"], trained))
     table = {"schema": "rsi-outcomes-v1", "experiment": experiment, "protocol_id": protocol_id,
              "sealed": not validation_only, "frozen_list_sha256": list_sha,
              "unseal_log_sha256": file_hash(paths["unseal_log"]) if paths["unseal_log"].exists() else None,
-             "columns": list(COLUMNS), "rows": rows, "programs": program_rows, "validations": validation_rows}
+             "columns": list(COLUMNS), "rows": rows, "programs": program_rows, "validations": validation_rows,
+             "diagnostics": diagnostic_rows}
     if not validation_only:
         table["body_scores"] = body_scores
+        table["strata_slices"] = strata_rows
     _guard(table, _forbidden(targets.values(), manifests))
     return table
 

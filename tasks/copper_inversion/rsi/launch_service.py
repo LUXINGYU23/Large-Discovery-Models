@@ -30,6 +30,7 @@ def main():
     parser.add_argument("--protocol", type=Path,
                         help="frozen protocol.json; its hashes.evaluator_image must equal --image")
     parser.add_argument("--tier", help="tier name in the release's sealed tier table")
+    parser.add_argument("--judge", default="standard", help="judge name in --protocol (default: standard)")
     parser.add_argument("--objective", choices=("confirmation", "oracle_iou"), default="confirmation")
     parser.add_argument("--import-source", type=Path,
                         help="continuation: private service directory of the source run")
@@ -71,9 +72,20 @@ def main():
                      "objective": args.objective}
     if args.tier is not None:
         configuration["tier"] = args.tier
-    if protocol_data is not None and "case_isolation" in protocol_data:
+    if protocol_data is not None:
         from . import protocol as protocols
-        configuration["case_isolation"] = protocols.case_isolation(protocol_data)
+        if "case_isolation" in protocol_data:
+            configuration["case_isolation"] = protocols.case_isolation(protocol_data)
+        judge = (protocol_data.get("judges") or {}).get(args.judge)
+        if isinstance(judge, dict):
+            if "resample" in judge:
+                configuration["resample"] = dict(judge["resample"])
+            if "confirmation_packs" in judge:
+                packs = judge["confirmation_packs"]
+                configuration["confirmation_packs"] = list(packs) if isinstance(packs, list) else packs
+        finalists = (protocol_data.get("loop") or {}).get("finalists")
+        if type(finalists) is int and finalists != 3:
+            configuration["finalists"] = finalists
     if args.import_source is not None:
         # The evaluator account reads its own copy of the public prefix, pinned by digest.
         prefix = args.import_ledger.read_bytes()
