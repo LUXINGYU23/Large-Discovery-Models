@@ -16,6 +16,7 @@ from ldm_tts.contracts.evaluation import EvaluationPaused
 from ldm_tts.engine.run_store import BudgetLedger,BudgetExceededError,atomic_json_write
 from ..core.candidate import seal,validate_source
 from ..core.execution import Execution,source_identity,digest
+from .contract import OBJECTIVE_VERSIONS
 from .suite import SuiteEvaluator,load_manifest,release_tiers,manifest_tiers,q1_seconds,OBJECTIVES
 from .budget import ScientificSlots
 from .domain import CheckedDomain
@@ -62,8 +63,8 @@ def resolve_tier(configuration,manifest):
 
 class EvaluatorService:
     configuration_keys=frozenset({"manifest","root","image","seconds","slots","caller_uid","socket"})
-    optional_keys=frozenset({"tier","objective","purpose","anonymize_cases","canonical_origin","randomize_orientation",
-                             "resample","confirmation_packs","finalists"})
+    optional_keys=frozenset({"tier","objective","objective_version","purpose","anonymize_cases","canonical_origin",
+                             "randomize_orientation","resample","confirmation_packs","finalists"})
     finalists=3
 
     def __init__(self,configuration):
@@ -72,6 +73,9 @@ class EvaluatorService:
             raise ValueError("invalid trusted service configuration")
         self.objective=configuration.get("objective","confirmation")
         if self.objective not in OBJECTIVES:raise ValueError("unknown evaluation objective")
+        objective_version=configuration.get("objective_version")
+        if objective_version is not None and objective_version not in OBJECTIVE_VERSIONS:
+            raise ValueError("unknown evaluation objective version")
         anonymize_cases=configuration.get("anonymize_cases",False)
         canonical_origin=configuration.get("canonical_origin",False)
         randomize_orientation=configuration.get("randomize_orientation",False)
@@ -116,7 +120,8 @@ class EvaluatorService:
             objective=self.objective,purpose=configuration.get("purpose"),
             anonymize_cases=anonymize_cases,canonical_origin=canonical_origin,
             randomize_orientation=randomize_orientation,
-            resample=configuration.get("resample"),confirmation_packs=configuration.get("confirmation_packs"))
+            resample=configuration.get("resample"),confirmation_packs=configuration.get("confirmation_packs"),
+            objective_version=objective_version)
 
     def dispatch(self,request):
         if not isinstance(request,dict):return {"status":"rejected_request"}

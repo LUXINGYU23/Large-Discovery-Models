@@ -10,6 +10,7 @@ from pathlib import Path
 from tasks.copper_inversion.rsi.ledger import read
 from tasks.copper_inversion.core.candidate import validate_source
 from tasks.copper_inversion.core.execution import digest
+from tasks.copper_inversion.v2.contract import OBJECTIVE_VERSIONS
 from tasks.copper_inversion.v2.service import EvaluatorService
 from tasks.copper_inversion.v2.suite import file_hash, load_manifest
 from tasks.copper_inversion.v2 import selection
@@ -86,7 +87,8 @@ def release_config(release):
 
 
 def evaluate_sources(service_root, manifest, seconds, slots, image, sources, *, tier=None, purpose=None, policy=None,
-                     anonymize_cases=False, canonical_origin=False, randomize_orientation=False):
+                     anonymize_cases=False, canonical_origin=False, randomize_orientation=False,
+                     objective_version=None):
     """Submit pinned sources to the v2 training service in the trusted process."""
     root, manifest = Path(service_root).resolve(), Path(manifest).resolve()
     if load_manifest(manifest)["split"] != "train":
@@ -103,6 +105,8 @@ def evaluate_sources(service_root, manifest, seconds, slots, image, sources, *, 
         config["canonical_origin"] = True
     if randomize_orientation:
         config["randomize_orientation"] = True
+    if objective_version is not None:
+        config["objective_version"] = objective_version
     if policy is None:
         service = EvaluatorService(config)
     else:
@@ -128,7 +132,7 @@ def evaluate_sources(service_root, manifest, seconds, slots, image, sources, *, 
 
 
 def evaluate(selection_path, release, output, image, *, policy=None, anonymize_cases=False, canonical_origin=False,
-             randomize_orientation=False):
+             randomize_orientation=False, objective_version=None):
     selection_path = Path(selection_path)
     chosen = json.loads(selection_path.read_text())
     if chosen.get("schema") != "rsi-q1-selection-v1":
@@ -168,6 +172,8 @@ def evaluate(selection_path, release, output, image, *, policy=None, anonymize_c
             identity["canonical_origin"] = True
         if randomize_orientation:
             identity["randomize_orientation"] = True
+        if objective_version is not None:
+            identity["objective_version"] = objective_version
         identity_path = root_path / "q1-layout.json"
         if identity_path.exists() and json.loads(identity_path.read_text()) != identity:
             raise ValueError("Q1 layout identity changed")
@@ -181,6 +187,8 @@ def evaluate(selection_path, release, output, image, *, policy=None, anonymize_c
             kwargs["canonical_origin"] = True
         if randomize_orientation:
             kwargs["randomize_orientation"] = True
+        if objective_version is not None:
+            kwargs["objective_version"] = objective_version
         if policy is not None:
             kwargs["policy"] = policy
         root = evaluate_sources(root_path, release / manifest, seconds, slots, image, entries, **kwargs)
@@ -193,7 +201,7 @@ def evaluate(selection_path, release, output, image, *, policy=None, anonymize_c
 
 
 def build_references(refs_path, release, output, image, *, policy=None, anonymize_cases=False, canonical_origin=False,
-                     randomize_orientation=False):
+                     randomize_orientation=False, objective_version=None):
     refs = references(refs_path)
     release, record = release_config(release)
     tier = record["tiers"]["S"]
@@ -207,6 +215,8 @@ def build_references(refs_path, release, output, image, *, policy=None, anonymiz
         kwargs["canonical_origin"] = True
     if randomize_orientation:
         kwargs["randomize_orientation"] = True
+    if objective_version is not None:
+        kwargs["objective_version"] = objective_version
     if policy is not None:
         kwargs["policy"] = policy
     service = evaluate_sources(output / "training", release / tier["train_manifest"], tier["solver_seconds"],
@@ -223,6 +233,8 @@ def build_references(refs_path, release, output, image, *, policy=None, anonymiz
                 freeze_opts["canonical_origin"] = True
             if randomize_orientation:
                 freeze_opts["randomize_orientation"] = True
+            if objective_version is not None:
+                freeze_opts["objective_version"] = objective_version
             selection.freeze(target, [ref["source"]], release / tier["validation_manifest"],
                              [release / p for p in tier["sealed_manifests"]], seconds=tier["solver_seconds"],
                              image=image, training_run=service, training_manifest=release / tier["train_manifest"],
@@ -264,16 +276,22 @@ def main(argv=None, *, policy=None):
     ref.add_argument("--image", required=True)
     for command in (measure, ref):
         command.add_argument("--protocol", type=Path, help="optional protocol.json setting case_isolation")
+        command.add_argument("--objective", choices=OBJECTIVE_VERSIONS,
+                             help="override objective version (e.g. objective_v3 on a legacy release)")
     args = parser.parse_args(argv)
     if args.command == "select":
         print(select(args.runs, args.output, args.seed))
     else:
         isolation = {"anonymize_cases": False, "canonical_origin": False, "randomize_orientation": False}
+        objective_version = args.objective
         if args.protocol is not None:
             from tasks.copper_inversion.rsi import protocol as protocols
-            isolation = protocols.case_isolation(protocols.load(args.protocol))
+            loaded_protocol = protocols.load(args.protocol)
+            isolation = protocols.case_isolation(loaded_protocol)
+            if objective_version is None and "objective_version" in loaded_protocol:
+                objective_version = loaded_protocol["objective_version"]
         flags = dict(anonymize_cases=isolation["anonymize_cases"], canonical_origin=isolation["canonical_origin"],
-                     randomize_orientation=isolation["randomize_orientation"])
+                     randomize_orientation=isolation["randomize_orientation"], objective_version=objective_version)
         if args.command == "evaluate":
             print(json.dumps(evaluate(args.selection, args.release, args.output, args.image, policy=policy, **flags), sort_keys=True))
         else:

@@ -2,11 +2,12 @@
 import json
 import os
 from pathlib import Path
+from .contract import validate
 from .suite import file_hash
 from .data import read_problem
 
 
-def verify_geological_constraints(manifest):
+def verify_geological_constraints(manifest, *, require_current_objective=False):
     """Formal data must enable a calibrated geometric prior, not just air masks."""
     manifest=Path(manifest).resolve()
     cases=json.loads(manifest.read_text()).get('cases',[])
@@ -15,7 +16,10 @@ def verify_geological_constraints(manifest):
         public=(manifest.parent/case['public']).resolve()
         if not public.is_relative_to(manifest.parent):raise ValueError('public path escapes release')
         from .geological_policy import public_priors
-        problem=read_problem(public);priors=problem['priors']
+        problem=read_problem(public)
+        if require_current_objective:
+            validate(problem, legacy=False)
+        priors=problem['priors']
         enabled=(priors['hard_volume_bounds'] is not None or priors['max_components'] is not None
                  or priors['area_weight']>0 or priors['volume_weight']>0
                  or (priors['fragment_weight']>0 and priors['fragment_volume']>0))
@@ -27,8 +31,9 @@ def verify_geological_constraints(manifest):
 TIER_KEYS={"solver_seconds","train_manifest","train_bodies","validation_manifest","sealed_manifests","slots"}
 EVIDENCE_V1=('calibration','population','historical_disjointness','confirmation','isolation','geological_constraints')
 # Release schema v2 (rsi-r1) adds the tier table, one-layout assignment, the
-# weak-judge thinning and the whole-hole audit.
+# weak-judge thinning and the whole-hole audit; v3 (rsi-r2) adds judge_validity.
 EVIDENCE_V2=EVIDENCE_V1+('hole_audit','layout','weak_judge')
+EVIDENCE_V3=EVIDENCE_V2+('judge_validity',)
 
 
 def verify_tiers(record,release=None,*,allow_unsealed=False):
@@ -62,9 +67,11 @@ def verify_release(manifest):
     release=manifest.parent.parent
     receipt=release/'qualification.json'
     record=json.loads(receipt.read_text())
-    if record.get('schema') not in {'copper-qualified-synthetic-v1','copper-qualified-synthetic-v2'} or record.get('status')!='qualified':
+    schemas={'copper-qualified-synthetic-v1','copper-qualified-synthetic-v2','copper-qualified-synthetic-v3'}
+    if record.get('schema') not in schemas or record.get('status')!='qualified':
         raise ValueError('missing qualified synthetic release')
-    v2=record['schema']=='copper-qualified-synthetic-v2'
+    v2=record['schema'] in {'copper-qualified-synthetic-v2','copper-qualified-synthetic-v3'}
+    v3=record['schema']=='copper-qualified-synthetic-v3'
     if os.geteuid()!=record['evaluator_uid'] or receipt.stat().st_uid!=record['evaluator_uid']:
         raise ValueError('formal release requires its independent evaluator account')
     if file_hash(manifest)!=record['manifest_sha256'].get(str(manifest.relative_to(release))):
@@ -73,10 +80,15 @@ def verify_release(manifest):
         path=(release/relative).resolve()
         if not path.is_relative_to(release) or file_hash(path)!=expected:
             raise ValueError('qualification evidence changed')
-    for name in (EVIDENCE_V2 if v2 else EVIDENCE_V1):
-        if 'evidence/'+name+'.json' not in record['evidence_sha256']:
+    required=list(EVIDENCE_V3 if v3 else (EVIDENCE_V2 if v2 else EVIDENCE_V1))
+    if not v3 and any(k in record['evidence_sha256'] for k in ('evidence/judge_validity.json','evidence/judge-validity.json')):
+        required.append('judge_validity')
+    for name in required:
+        candidates=('evidence/judge_validity.json','evidence/judge-validity.json') if name=='judge_validity' else ('evidence/'+name+'.json',)
+        rel=next((c for c in candidates if c in record['evidence_sha256']),None)
+        if rel is None:
             raise ValueError('qualification does not seal evidence: '+name)
-        evidence=json.loads((release/'evidence'/f'{name}.json').read_text())
+        evidence=json.loads((release/rel).read_text())
         if evidence.get('status')!='passed':raise ValueError('incomplete qualification: '+name)
         if name=='geological_constraints' and (
                 evidence.get('calibration_scope')!='independent_development'
@@ -91,5 +103,5 @@ def verify_release(manifest):
             for key in ('train_manifest','validation_manifest'):
                 if key in judge and judge[key] not in record['manifest_sha256']:
                     raise ValueError('judge manifest not covered by qualification')
-    verify_geological_constraints(manifest)
+    verify_geological_constraints(manifest,require_current_objective=v3)
     return record

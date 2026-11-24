@@ -14,10 +14,16 @@ from .metrics import compare
 from ..core.geometry import read_model
 
 
+CONFIRMATION_KEYS = {"loss_binary", "loss_contact", "loss_jaccard", "tp", "fp", "fn", "loss_total", "objective_version"}
+CONFIRMATION_SUFFIXES = ("_label_error", "_contact_rmse", "_tp", "_fp", "_fn", "_kept_samples")
+
+
 def _load_checked_confirmation(problem, path):
     if not path.exists():
         return None
     confirmation = read_problem(path)
+    if confirmation["objective_version"] != problem["objective_version"]:
+        raise ValueError("confirmation objective version differs")
     if confirmation['priors'] != problem['priors']:
         raise ValueError('confirmation geological priors differ')
     if any(confirmation[key] != problem[key] for key in ("shape", "spacing", "origin")):
@@ -28,7 +34,7 @@ def _load_checked_confirmation(problem, path):
     return confirmation
 
 
-def score_case(inputs, model, truth_root):
+def score_case(inputs, model, truth_root, *, objective_version=None):
     """One case; bad trusted data raises (infrastructure), a bad model is invalid."""
     problem = read_problem(inputs)
     # Bad trusted data is an infrastructure failure, never a candidate penalty.
@@ -43,17 +49,17 @@ def score_case(inputs, model, truth_root):
     full_confirmation = _load_checked_confirmation(problem, Path(truth_root) / "full_confirmation")
     try:
         field = read_model(Path(model) / "model.npy", problem["shape"])
-        metrics = score(problem, field)
+        metrics = score(problem, field, objective_version=objective_version)
         if truth is not None:
             metrics.update(compare(problem, field, truth))
         if confirmation is not None:
-            hidden = score(confirmation, field)
+            hidden = score(confirmation, field, objective_version=objective_version)
             metrics.update({"confirmation_" + key: value for key, value in hidden.items()
-                            if key in {"loss_binary", "loss_contact", "loss_total"} or key.endswith(("_label_error", "_contact_rmse"))})
+                            if key in CONFIRMATION_KEYS or key.endswith(CONFIRMATION_SUFFIXES)})
         if full_confirmation is not None:
-            full_hidden = score(full_confirmation, field)
+            full_hidden = score(full_confirmation, field, objective_version=objective_version)
             metrics.update({"full_confirmation_" + key: value for key, value in full_hidden.items()
-                            if key in {"loss_binary", "loss_contact", "loss_total"}})
+                            if key in CONFIRMATION_KEYS})
         return dict(status="succeeded", metrics=metrics)
     except ValueError as exc:
         return dict(status="invalid", error=str(exc), metrics={"iou": 0.} if truth is not None else {})

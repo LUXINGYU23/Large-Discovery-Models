@@ -4,7 +4,9 @@ import numpy as np
 
 SCHEMA = "problem_schema_v2"
 GEOMETRY = "occupancy_v2"
-OBJECTIVE = "objective_v2"
+OBJECTIVE = "objective_v3"
+LEGACY_OBJECTIVE = "objective_v2"
+OBJECTIVE_VERSIONS = (OBJECTIVE, LEGACY_OBJECTIVE)
 PUBLIC_KEYS = {
     "schema_version", "geometry_version", "objective_version", "case_id",
     "shape", "origin", "spacing", "domain_mask", "forbidden_mask",
@@ -16,13 +18,15 @@ OBS_KEYS = {"name", "points", "labels", "groups", "weight", "transition_scale",
             "contact_sigma", "label_error"}
 
 
-def validate(problem):
+def validate(problem, *, legacy=True):
     if set(problem) != PUBLIC_KEYS:
         raise ValueError("public problem fields differ from v2 contract")
-    for key, value in (("schema_version", SCHEMA), ("geometry_version", GEOMETRY),
-                       ("objective_version", OBJECTIVE)):
+    for key, value in (("schema_version", SCHEMA), ("geometry_version", GEOMETRY)):
         if problem[key] != value:
             raise ValueError(f"unsupported {key}")
+    allowed = OBJECTIVE_VERSIONS if legacy else (OBJECTIVE,)
+    if problem["objective_version"] not in allowed:
+        raise ValueError("unsupported objective_version")
     shape = problem["shape"]
     if len(shape) != 3 or any(type(n) is not int or n < 2 for n in shape):
         raise ValueError("v2 requires a 3D grid with at least two cells per axis")

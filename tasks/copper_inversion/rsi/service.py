@@ -233,7 +233,8 @@ class RiskOnlyService(EvaluatorService):
             actual = [(row["case_id"], row["seed"], row["parent_id"]) for row in rows]
             if len(actual) != len(expected) or set(actual) != expected:
                 raise ValueError("private receipt does not cover the planned cases")
-            private_case_risks = risk_by_case(rows, self.audit["case_ids"], self.objective)
+            private_case_risks = risk_by_case(rows, self.audit["case_ids"], self.objective,
+                                              getattr(self.evaluator, "objective_version", None))
             status = "failed" if metrics["legal_rate"] == 0 else "valid"
             message = "all planned solves failed" if status == "failed" else ""
         mode = self.case_isolation["case_feedback"]

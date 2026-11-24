@@ -12,6 +12,7 @@ from ldm_tts.contracts import RawProposal,CandidateRejection
 from ldm_tts.engine.run_store import atomic_json_write
 from ..core.candidate import seal,validate_source
 from ..core.execution import Execution,digest,source_identity
+from .contract import OBJECTIVE_VERSIONS
 from .suite import SuiteEvaluator,load_manifest,file_hash,release_tiers,manifest_tiers,OBJECTIVES
 from .domain import CheckedDomain
 from .interface_checks import InterfaceChecks
@@ -42,12 +43,15 @@ def selection_seconds(training_manifest,training,manifests,loaded):
 
 
 def freeze(root,sources,validation,tests,*,seconds,image,training_run,training_manifest,objective="confirmation",
-           max_candidates=3,anonymize_cases=False,canonical_origin=False,randomize_orientation=False):
+           max_candidates=3,anonymize_cases=False,canonical_origin=False,randomize_orientation=False,
+           objective_version=None):
     """objective is the run judge's validation scoring; sealed outcomes stay IoU."""
     root=Path(root)
     if any(type(v) is not bool for v in (anonymize_cases,canonical_origin,randomize_orientation)):
         raise ValueError("invalid case isolation flags")
     if objective not in OBJECTIVES:raise ValueError("unknown selection objective")
+    if objective_version is not None and objective_version not in OBJECTIVE_VERSIONS:
+        raise ValueError("unknown selection objective version")
     if not sources or (max_candidates is not None and len(sources)>max_candidates):
         raise ValueError("freeze one to three candidates before validation")
     if len(tests)!=2:raise ValueError("both ID and OOD test suites required")
@@ -88,6 +92,7 @@ def freeze(root,sources,validation,tests,*,seconds,image,training_run,training_m
     if anonymize_cases:frozen["anonymize_cases"]=True
     if canonical_origin:frozen["canonical_origin"]=True
     if randomize_orientation:frozen["randomize_orientation"]=True
+    if objective_version is not None:frozen["objective_version"]=objective_version
     atomic_json_write(root/"frozen.json",frozen)
     atomic_json_write(root/"state.json",dict(phase="frozen",frozen_sha256=digest(frozen)))
     return frozen
@@ -168,6 +173,7 @@ def run(root,phase):
                 if frozen.get("anonymize_cases"):options["anonymize_cases"]=True
                 if frozen.get("canonical_origin"):options["canonical_origin"]=True
                 if frozen.get("randomize_orientation"):options["randomize_orientation"]=True
+                if frozen.get("objective_version"):options["objective_version"]=frozen["objective_version"]
                 evaluator=SuiteEvaluator(work,execution,frozen["manifests"][index]["path"],frozen["seconds"],**options)
                 result=evaluator.evaluate(candidate)
                 rows.append(dict(source_sha256=payload["sha256"],split=split,metrics=dict(result.metrics)))

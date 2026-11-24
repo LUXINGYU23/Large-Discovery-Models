@@ -5,6 +5,7 @@ from ldm_tts.contracts import (
 )
 from ..core.encoding import encoding_spec
 from ..core.surrogate import LossSelector
+from .contract import OBJECTIVE
 
 
 def describe_task(suite_digest):
@@ -15,7 +16,7 @@ def describe_task(suite_digest):
         candidate_domain=CandidateDomainSpec(name="inversion_algorithm",kind="python_source",dimension=None,
             representation="One immutable solve(problem, budget, seed) program for every case"),
         objectives=(ObjectiveSpec(name="loss_total",direction="minimize",
-            description="Parent-macro independent measurement and geological-prior loss L/(1+L); failed solves count as one; IoU is diagnostic"),),
+            description="Parent-macro independent measurement noise-corrected line-Jaccard loss; failed solves count as one; IoU is diagnostic"),),
         response_spaces=(ResponseSpaceSpec(name="solver_artifact",output_kind="json",
             description="Sealed solver sources with parent and research rationale"),),
         acquisition=LossSelector("fusion").describe(),
@@ -25,7 +26,7 @@ def describe_task(suite_digest):
             candidate_validator="Read-only v2 interface fixtures",deduplication_key="SHA256 of source bytes"),
         surrogate=encoding_spec("fusion"),
         proposal_search=ProposalSearchSpec(name="shared_research_tree"),
-        metadata=dict(problem_schema="problem_schema_v2",geometry="occupancy_v2",objective="objective_v2",
+        metadata=dict(problem_schema="problem_schema_v2",geometry="occupancy_v2",objective=OBJECTIVE,
             suite_digest=suite_digest,encoding="fusion",block_weights=[.5,.5],
             outer_objective="parent_macro_confirmation_loss",solver_objective="public_data_and_geological_priors"),
     )

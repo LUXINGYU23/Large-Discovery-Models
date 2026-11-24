@@ -2,6 +2,8 @@
 
 import math
 import re
+from ..v2.contract import OBJECTIVE_VERSIONS
+from ..v2.suite import confirmation_utility, row_objective_version
 
 
 VERSION = "rsi-feedback-v2"
@@ -15,7 +17,9 @@ def valid_case_id(value):
     return isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", value) is not None
 
 
-def risk_by_case(rows, case_ids, objective="confirmation"):
+def risk_by_case(rows, case_ids, objective="confirmation", objective_version=None):
+    if objective_version is not None and objective_version not in OBJECTIVE_VERSIONS:
+        raise ValueError("unknown objective version in private receipt")
     grouped = {case_id: [] for case_id in case_ids}
     for row in rows:
         case_id = row["case_id"]
@@ -28,7 +32,8 @@ def risk_by_case(rows, case_ids, objective="confirmation"):
             loss = row["metrics"]["confirmation_loss_total"]
             if type(loss) not in (int, float) or not math.isfinite(loss) or loss < 0:
                 raise ValueError("invalid confirmation loss in private receipt")
-            value = loss / (1.0 + loss)
+            ver = row_objective_version(row) if objective_version is None else objective_version
+            value = 1.0 - confirmation_utility(loss, ver)
         else:
             value = 1.0
         grouped[case_id].append(value)
