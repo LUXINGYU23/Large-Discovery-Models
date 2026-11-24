@@ -7,10 +7,13 @@ import inspect
 import json
 import os
 import socket
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from ldm_tts.engine.run_store import atomic_json_write
+from ldm_tts.harness.client import classify_provider_error
+from ldm_tts.harness.protocol import HarnessError
 from ..core.encoding import CodeEncoder
 from ..core.execution import digest, docker
 from ..v2.public_catalog import catalog_digest, load_catalog
@@ -242,6 +245,33 @@ def prepare(args):
             "agent": agent_settings(protocol), "continuation": continued}
 
 
+PROVIDER_PAUSE_EXIT_CODE = 75
+PROVIDER_PAUSE_REASONS = frozenset({"provider_balance", "provider_rate_limit", "provider_server_error"})
+
+
+def _provider_pause_reason(exc):
+    if not isinstance(exc, HarnessError):
+        return None
+    reason = exc.provider_error or classify_provider_error(str(exc), exc.code)
+    return reason if reason in PROVIDER_PAUSE_REASONS else None
+
+
+def _pause_scheduler(reason, exc, environ=os.environ):
+    """Write the scheduler's PAUSED.json using the same atomic fault/link format as JobQueue.pause."""
+    policy_path = environ.get("LDM4GEO_SCHEDULING_POLICY")
+    if not policy_path:
+        return False
+    try:
+        queue_root = json.loads(Path(policy_path).read_text()).get("queue_root")
+    except (OSError, ValueError):
+        return False
+    if not queue_root or not Path(queue_root).is_dir():
+        return False
+    from tasks.copper_inversion.experiments.v2.parallel_runtime import JobQueue
+    JobQueue(queue_root, 1, 1).pause(f"{reason}: {exc}")
+    return True
+
+
 def evaluation_concurrency(environ=os.environ):
     """Concurrent evaluations per round from the scheduling policy (parallel_runtime ``rsi`` mode).
 
@@ -323,6 +353,15 @@ def main(argv=None):
                 or sealed["source_sha256s"] != result["training_finalists"]):
             raise ValueError("public and private training records or finalists differ")
     except Exception as exc:
+        reason = _provider_pause_reason(exc)
+        if reason is not None:
+            _pause_scheduler(reason, exc)
+            if args.out_dir.exists():
+                atomic_json_write(args.out_dir / "run-status.json",
+                                  {"status": "paused", "reason": reason, "error_type": type(exc).__name__})
+            print(json.dumps({"status": "paused", "reason": reason, "error": str(exc)}, sort_keys=True),
+                  file=sys.stderr, flush=True)
+            return PROVIDER_PAUSE_EXIT_CODE
         if args.out_dir.exists():
             atomic_json_write(args.out_dir / "run-status.json", {"status": "paused", "error_type": type(exc).__name__})
         raise

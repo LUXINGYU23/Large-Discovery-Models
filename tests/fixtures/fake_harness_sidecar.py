@@ -53,6 +53,16 @@ for line in sys.stdin:
         response = {"type": "initialized", **common, "profiles": profiles, "manifest": "manifest.json"}
     elif frame["type"] == "run_turn":
         turn_requests += 1
+        error_sequence_raw = os.environ.get("HARNESS_TEST_ERROR_SEQUENCE")
+        if error_sequence_raw:
+            error_sequence = json.loads(error_sequence_raw)
+            if turn_requests <= len(error_sequence):
+                item_error = error_sequence[turn_requests - 1]
+                error = {"message": item_error["message"]}
+                if item_error.get("code"):
+                    error["code"] = item_error["code"]
+                print(json.dumps({"type": "error", **common, "error": error}), flush=True)
+                continue
         failure = os.environ.get("HARNESS_TEST_TURN_FAILURE")
         if failure:
             error = {"message": "provider 502"}

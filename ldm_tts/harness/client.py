@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import math
 import os
 import queue
+import re
 import subprocess
+import sys
 import threading
 import time
+import urllib.error
+import urllib.request
 from collections import deque
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Any
 
 from ldm_tts.harness import responses
@@ -31,6 +37,105 @@ from ldm_tts.harness.protocol import (
 SubmissionValidator = Callable[[HarnessSubmissionRequest], HarnessSubmissionValidation]
 SubmissionBatchValidator = Callable[[tuple[HarnessSubmissionRequest, ...]], Mapping[str, HarnessSubmissionValidation]]
 ProviderAuthorizer = Callable[[HarnessProviderAuthorizationRequest], bool]
+
+MAX_PROVIDER_RETRY_WAIT_SECONDS = 1800.0
+MAX_RETRY_BACKOFF_SECONDS = 60.0
+
+_PROVIDER_BALANCE_RE = re.compile(
+    r"insufficient[_ ]balance|payment\s+required|"
+    r"(?:api\s+error\s*\(|http\s+|status(?:\s+code)?[\s:=]+|provider\s+|error\s*\()402\b|"
+    r"\b402\s+(?:payment\s+required|insufficient\s+balance)",
+    re.IGNORECASE,
+)
+_PROVIDER_RATE_LIMIT_RE = re.compile(
+    r"rate_limit_exceeded|too\s+many\s+requests|"
+    r"(?:api\s+error\s*\(|http\s+|status(?:\s+code)?[\s:=]+|provider\s+|error\s*\()429\b|"
+    r"\b429\s+too\s+many",
+    re.IGNORECASE,
+)
+_PROVIDER_SERVER_ERROR_RE = re.compile(
+    r"internal_server_error|overloaded_error|bad\s+gateway|service\s+unavailable|gateway\s+timeout|\bserver_error\b|"
+    r"(?:api\s+error\s*\(|http\s+|status(?:\s+code)?[\s:=]+|provider\s+|error\s*\()5[0-9]{2}\b|"
+    r"\b5[0-9]{2}\s+(?:internal|bad\s+gateway|service\s+unavailable|gateway\s+timeout|server\s+error)",
+    re.IGNORECASE,
+)
+
+
+def classify_provider_error(message: str, code: str | None = None) -> str | None:
+    """Classify provider HTTP errors from sidecar messages or probe failures."""
+    text = f"{code or ''} {message or ''}"
+    if _PROVIDER_BALANCE_RE.search(text):
+        return "provider_balance"
+    if _PROVIDER_RATE_LIMIT_RE.search(text):
+        return "provider_rate_limit"
+    if _PROVIDER_SERVER_ERROR_RE.search(text):
+        return "provider_server_error"
+    return None
+
+
+def probe_provider(
+    base_url: str,
+    model: str,
+    api_key: str,
+    *,
+    max_output_tokens: int = 1,
+    timeout_seconds: float = 30.0,
+) -> dict[str, Any]:
+    """Send a minimal 1-token Responses API request to verify provider health and balance."""
+    if not base_url.strip() or not model.strip():
+        raise ValueError("provider probe requires base_url and model")
+    if not api_key or not api_key.strip():
+        raise ValueError("provider probe requires a non-empty API key")
+    key = api_key.strip()
+    url = base_url.rstrip("/") + "/responses"
+    payload = json.dumps({
+        "model": model,
+        "input": "ping",
+        "max_output_tokens": int(max_output_tokens),
+        "stream": False,
+        "store": False,
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        url,
+        data=payload,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "ldm-harness-probe/1",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            status = getattr(response, "status", response.getcode())
+            response.read(4096)
+            if status != 200:
+                msg = f"provider probe failed: OpenAI API error ({status})"
+                kind = classify_provider_error(msg)
+                raise HarnessError(
+                    msg,
+                    retryable=kind in ("provider_rate_limit", "provider_server_error"),
+                    provider_error=kind,
+                )
+            return {"status": int(status), "url": url, "model": model}
+    except urllib.error.HTTPError as exc:
+        try:
+            body = exc.read(512).decode("utf-8", errors="replace").strip()
+        except Exception:
+            body = ""
+        if key in body:
+            body = body.replace(key, "[REDACTED]")
+        msg = f"provider probe failed: OpenAI API error ({exc.code})" + (f": {body}" if body else "")
+        kind = classify_provider_error(msg)
+        raise HarnessError(
+            msg,
+            retryable=kind in ("provider_rate_limit", "provider_server_error"),
+            provider_error=kind,
+        ) from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        detail = str(exc).replace(key, "[REDACTED]")
+        raise HarnessError(f"provider probe transport failed: {detail}", retryable=True) from exc
 
 
 class HarnessClient:
@@ -197,6 +302,7 @@ class HarnessClient:
 
         known_usage: dict[str, dict[str, Any]] = {}
         retry_delay = 1.0
+        provider_waited = 0.0
         restart_required = False
         while True:
             try:
@@ -221,15 +327,36 @@ class HarnessClient:
                         validation_submissions.get(profile, 0)
                     )
                 exc.turn_usage = {profile: dict(usage) for profile, usage in known_usage.items()}
+                provider_error = exc.provider_error or classify_provider_error(str(exc), exc.code)
+                if provider_error is not None and exc.provider_error is None:
+                    exc.provider_error = provider_error
+                if provider_error == "provider_balance":
+                    exc.retryable = False
+                    raise
+                if provider_error in ("provider_rate_limit", "provider_server_error"):
+                    exc.retryable = True
                 remaining = recovery_deadline - time.monotonic()
                 if not exc.retryable or remaining <= 0:
                     raise
                 restart_required = self._process is None or self._process.poll() is not None
-                logging.getLogger(__name__).warning(
-                    "Continuing unfinished Harness sessions; committed turns are replayed: %s", exc,
-                )
-                time.sleep(min(retry_delay, remaining))
-                retry_delay = min(30.0, retry_delay * 2)
+                if provider_error in ("provider_rate_limit", "provider_server_error"):
+                    wait_budget = min(remaining, MAX_PROVIDER_RETRY_WAIT_SECONDS - provider_waited)
+                    if wait_budget <= 0:
+                        raise
+                    delay = min(retry_delay, wait_budget)
+                    logging.getLogger(__name__).warning(
+                        "Retrying provider error (%s) after %.1fs (waited %.1fs/%.0fs): %s",
+                        provider_error, delay, provider_waited, MAX_PROVIDER_RETRY_WAIT_SECONDS, exc,
+                    )
+                    time.sleep(delay)
+                    provider_waited += delay
+                    retry_delay = min(MAX_RETRY_BACKOFF_SECONDS, retry_delay * 2)
+                else:
+                    logging.getLogger(__name__).warning(
+                        "Continuing unfinished Harness sessions; committed turns are replayed: %s", exc,
+                    )
+                    time.sleep(min(retry_delay, remaining))
+                    retry_delay = min(30.0, retry_delay * 2)
                 if time.monotonic() >= recovery_deadline:
                     raise
         raw_turns = payload.get("turns")
@@ -433,10 +560,19 @@ class HarnessClient:
                 if profile in turn_usage or profile not in expected or item["turnId"] != expected[profile]:
                     raise HarnessError("harness error usage does not match the requested turn")
                 turn_usage[profile] = responses.parse_usage(item["usage"])
+            code = error.get("code") if isinstance(error, dict) else None
+            provider_error = classify_provider_error(str(message), code)
+            if provider_error == "provider_balance":
+                retryable = False
+            elif provider_error in ("provider_rate_limit", "provider_server_error"):
+                retryable = True
+            else:
+                retryable = isinstance(error, dict) and code == "recoverable_turn_error"
             raise HarnessError(
                 str(message), turn_usage=turn_usage,
-                retryable=isinstance(error, dict) and error.get("code") == "recoverable_turn_error",
-                code=error.get("code") if isinstance(error, dict) else None,
+                retryable=retryable,
+                code=code,
+                provider_error=provider_error,
             )
         if response.get("type") != expected_type:
             raise HarnessError(f"expected harness response {expected_type!r}")
@@ -602,4 +738,36 @@ def _terminate(process: subprocess.Popen[str]) -> None:
         process.wait(timeout=10)
 
 
-__all__ = ["HarnessClient"]
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Harness client utilities.")
+    sub = parser.add_subparsers(dest="command", required=True)
+    p = sub.add_parser("probe", help="Send a 1-token Responses API health/balance probe.")
+    p.add_argument("--base-url", required=True)
+    p.add_argument("--model", required=True)
+    p.add_argument("--api-key-file", required=True, type=Path)
+    p.add_argument("--timeout", type=float, default=30.0)
+    args = parser.parse_args(argv)
+    if args.command == "probe":
+        try:
+            key = args.api_key_file.read_text(encoding="utf-8").strip()
+            result = probe_provider(args.base_url, args.model, key, timeout_seconds=args.timeout)
+        except Exception as exc:
+            kind = exc.provider_error if isinstance(exc, HarnessError) else None
+            print(json.dumps({"ok": False, "provider_error": kind, "error": str(exc)}, sort_keys=True))
+            return 1
+        print(json.dumps({"ok": True, **result}, sort_keys=True))
+        return 0
+    return 2
+
+
+__all__ = [
+    "HarnessClient",
+    "MAX_PROVIDER_RETRY_WAIT_SECONDS",
+    "MAX_RETRY_BACKOFF_SECONDS",
+    "classify_provider_error",
+    "probe_provider",
+]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
