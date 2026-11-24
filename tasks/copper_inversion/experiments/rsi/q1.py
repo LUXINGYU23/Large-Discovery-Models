@@ -56,22 +56,34 @@ def select(runs, output, seed):
 
 
 def references(path):
-    """Load precommitted source files, checking their exact byte hashes."""
+    """Load precommitted source files or precomputed offline field trees, checking exact hashes."""
     path = Path(path).resolve()
     data = json.loads(path.read_text())
     if not isinstance(data, dict) or not data:
         raise ValueError("references must be a nonempty name to source mapping")
     out = {}
     for name, item in sorted(data.items()):
-        if not isinstance(name, str) or not name or not isinstance(item, dict) or set(item) != {"source", "sha256"}:
+        if not isinstance(name, str) or not name or not isinstance(item, dict):
             raise ValueError("invalid reference entry")
-        source = Path(item["source"])
-        if not source.is_absolute():
-            source = path.parent / source
-        source = source.resolve()
-        if file_hash(source) != item["sha256"] or validate_source(source.read_bytes()) != item["sha256"]:
-            raise ValueError("reference source hash differs")
-        out[name] = {"source": str(source), "sha256": item["sha256"]}
+        if set(item) == {"source", "sha256"}:
+            source = Path(item["source"])
+            if not source.is_absolute():
+                source = path.parent / source
+            source = source.resolve()
+            if file_hash(source) != item["sha256"] or validate_source(source.read_bytes()) != item["sha256"]:
+                raise ValueError("reference source hash differs")
+            out[name] = {"source": str(source), "sha256": item["sha256"]}
+        elif set(item) == {"fields", "sha256"}:
+            fields_dir = Path(item["fields"])
+            if not fields_dir.is_absolute():
+                fields_dir = path.parent / fields_dir
+            fields_dir = fields_dir.resolve()
+            _, sha = selection.precomputed_manifest(fields_dir)
+            if sha != item["sha256"]:
+                raise ValueError("reference fields hash differs")
+            out[name] = {"fields": str(fields_dir), "sha256": sha}
+        else:
+            raise ValueError("invalid reference entry")
     return out
 
 
@@ -209,24 +221,36 @@ def build_references(refs_path, release, output, image, *, policy=None, anonymiz
         kwargs["randomize_orientation"] = True
     if policy is not None:
         kwargs["policy"] = policy
-    service = evaluate_sources(output / "training", release / tier["train_manifest"], tier["solver_seconds"],
-                               tier["slots"], image, [(r["source"], r["sha256"]) for r in refs.values()], **kwargs)
+    source_entries = [(r["source"], r["sha256"]) for r in refs.values() if "source" in r]
+    service = None
+    if source_entries:
+        service = evaluate_sources(output / "training", release / tier["train_manifest"], tier["solver_seconds"],
+                                   tier["slots"], image, source_entries, **kwargs)
     mapping = {}
     def validate(item):
         name, ref = item
         target = output / "selection" / hashlib.sha256(name.encode()).hexdigest()
         if not target.exists():
-            freeze_opts = {}
-            if anonymize_cases:
-                freeze_opts["anonymize_cases"] = True
-            if canonical_origin:
-                freeze_opts["canonical_origin"] = True
-            if randomize_orientation:
-                freeze_opts["randomize_orientation"] = True
-            selection.freeze(target, [ref["source"]], release / tier["validation_manifest"],
-                             [release / p for p in tier["sealed_manifests"]], seconds=tier["solver_seconds"],
-                             image=image, training_run=service, training_manifest=release / tier["train_manifest"],
-                             **freeze_opts)
+            if "fields" in ref:
+                if anonymize_cases or canonical_origin or randomize_orientation:
+                    raise ValueError("precomputed offline references cannot use case isolation transforms")
+                selection.freeze_precomputed(
+                    target, ref["fields"], release / tier["validation_manifest"],
+                    [release / p for p in tier["sealed_manifests"]], seconds=tier["solver_seconds"],
+                    image=image, training_manifest=release / tier["train_manifest"],
+                )
+            else:
+                freeze_opts = {}
+                if anonymize_cases:
+                    freeze_opts["anonymize_cases"] = True
+                if canonical_origin:
+                    freeze_opts["canonical_origin"] = True
+                if randomize_orientation:
+                    freeze_opts["randomize_orientation"] = True
+                selection.freeze(target, [ref["source"]], release / tier["validation_manifest"],
+                                 [release / p for p in tier["sealed_manifests"]], seconds=tier["solver_seconds"],
+                                 image=image, training_run=service, training_manifest=release / tier["train_manifest"],
+                                 **freeze_opts)
         frozen, _ = selection.verify(target)
         if len(frozen["candidates"]) != 1 or frozen["candidates"][0]["sha256"] != ref["sha256"]:
             raise ValueError("reference selection differs")
