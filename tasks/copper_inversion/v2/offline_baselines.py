@@ -196,20 +196,34 @@ OFFLINE_REFERENCE_SOLVERS = {
 
 
 def materialize_precomputed_reference(solver_name, stage_a_dir, release_dir, output_dir,
-                                      *, splits=("train", "validation", "test_id", "test_ood")):
+                                      *, splits=("train", "validation", "test_id", "test_ood"), tier=None):
     """Materialize Stage-B legal model.npy files on public inputs only and return precomputed_manifest sha256."""
     from ldm_tts.engine.run_store import atomic_json_write
     from .selection import precomputed_manifest
     if solver_name not in OFFLINE_REFERENCE_SOLVERS:
         raise ValueError(f"unknown offline solver: {solver_name!r}")
     solver = OFFLINE_REFERENCE_SOLVERS[solver_name]
+    stage_a_dir = Path(stage_a_dir).resolve()
     release_dir = Path(release_dir).resolve()
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    for split in splits:
-        manifest_path = release_dir / split / "manifest.json"
+    if tier is not None:
+        rec_path = next((release_dir / n for n in ("qualification.json", "development-receipt.json")
+                         if (release_dir / n).is_file()), None)
+        if rec_path is None:
+            raise ValueError(f"release record missing in {release_dir}")
+        row = json.loads(rec_path.read_text())["tiers"][tier]
+        budget_s = float(row["solver_seconds"])
+        rel_manifests = [row["train_manifest"], row["validation_manifest"], *row["sealed_manifests"]]
+        plan = [(release_dir / rel, Path(rel).parent.as_posix(), budget_s) for rel in rel_manifests]
+    else:
+        plan = [(release_dir / split / "manifest.json", split, 120.0) for split in splits]
+
+    for manifest_path, stage_a_sub, budget_s in plan:
         manifest = json.loads(manifest_path.read_text())
+        target_split = manifest["split"]
+        use_split = stage_a_sub if (stage_a_dir / stage_a_sub).is_dir() else target_split
         seeds = manifest["seeds"]
         for case in manifest["cases"]:
             # Strictly read ONLY public problem files; never access case["truth"].
@@ -217,10 +231,10 @@ def materialize_precomputed_reference(solver_name, stage_a_dir, release_dir, out
             for seed in seeds:
                 diag = {}
                 field = solver(
-                    problem, {"wall_time_seconds": 120.0}, int(seed),
-                    fields_dir=stage_a_dir, split=split, diagnostics=diag,
+                    problem, {"wall_time_seconds": budget_s}, int(seed),
+                    fields_dir=stage_a_dir, split=use_split, diagnostics=diag,
                 )
-                dst = output_dir / split / case["case_id"] / str(seed)
+                dst = output_dir / target_split / case["case_id"] / str(seed)
                 dst.mkdir(parents=True, exist_ok=True)
                 np.save(dst / "model.npy", np.asarray(field, dtype=np.float64), allow_pickle=False)
                 atomic_json_write(dst / "meta.json", {"wall_seconds": round(float(diag.get("wall_seconds", 0.0)), 6)})

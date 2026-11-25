@@ -131,10 +131,13 @@ def _evaluate_precomputed_with_evaluator(evaluator,sha,split_models):
         payload=dict(sha256=sha,kind="precomputed")))
 
 
-def freeze_precomputed(root,fields_dir,validation,tests,*,seconds,image,training_manifest,objective="confirmation"):
+def freeze_precomputed(root,fields_dir,validation,tests,*,seconds,image,training_manifest,objective="confirmation",
+                       objective_version=None):
     """Freeze precomputed offline fields (M4/M7/RF) across train, validation and sealed splits for REF."""
     root=Path(root)
     if objective not in OBJECTIVES:raise ValueError("unknown selection objective")
+    if objective_version is not None and objective_version not in OBJECTIVE_VERSIONS:
+        raise ValueError("unknown selection objective version")
     if len(tests)!=2:raise ValueError("both ID and OOD test suites required")
     training_path=Path(training_manifest).resolve()
     manifests=[Path(validation).resolve(),*[Path(p).resolve() for p in tests]]
@@ -207,6 +210,7 @@ def freeze_precomputed(root,fields_dir,validation,tests,*,seconds,image,training
     execution=Execution(train_work/"jobs",image)
     if execution.image!=image:raise ValueError("freeze a resolved image digest")
     opts={} if objective=="confirmation" else {"objective":objective}
+    if objective_version is not None:opts["objective_version"]=objective_version
     evaluator=SuiteEvaluator(train_work,execution,training_path,seconds,**opts)
     train_models={cid:{s:{**e,"path":str(root/e["path"])} for s,e in seeds.items()}
                   for cid,seeds in models["train"].items()}
@@ -227,6 +231,7 @@ def freeze_precomputed(root,fields_dir,validation,tests,*,seconds,image,training
         manifests=[dict(path=str(p),sha256=file_hash(p),contents_sha256=digest(m)) for p,m in zip(manifests,loaded)],
         implementation_sha256=source_identity(),image=image,seconds=seconds,selection_objective=objective,
         selection_rule=SELECTION_RULES[objective])
+    if objective_version is not None:frozen["objective_version"]=objective_version
     atomic_json_write(root/"frozen.json",frozen)
     atomic_json_write(root/"state.json",dict(phase="frozen",frozen_sha256=digest(frozen)))
     return frozen
@@ -308,6 +313,7 @@ def run(root,phase):
                     if execution.image!=frozen["image"]:raise ValueError("freeze a resolved image digest")
                     objective=frozen.get("selection_objective","confirmation") if phase=="validation" else "confirmation"
                     options={} if objective=="confirmation" else {"objective":objective}
+                    if frozen.get("objective_version"):options["objective_version"]=frozen["objective_version"]
                     evaluator=SuiteEvaluator(work,execution,frozen["manifests"][index]["path"],frozen["seconds"],**options)
                     split_models={cid:{s:{**e,"path":str(root/e["path"])} for s,e in seeds.items()}
                                   for cid,seeds in payload["models"][split].items()}

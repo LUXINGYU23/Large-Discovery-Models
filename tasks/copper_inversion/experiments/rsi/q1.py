@@ -242,12 +242,14 @@ def build_references(refs_path, release, output, image, *, policy=None, anonymiz
         target = output / "selection" / hashlib.sha256(name.encode()).hexdigest()
         if not target.exists():
             if "fields" in ref:
-                if anonymize_cases or canonical_origin or randomize_orientation:
-                    raise ValueError("precomputed offline references cannot use case isolation transforms")
+                pre_opts = {}
+                if objective_version is not None:
+                    pre_opts["objective_version"] = objective_version
                 selection.freeze_precomputed(
                     target, ref["fields"], release / tier["validation_manifest"],
                     [release / p for p in tier["sealed_manifests"]], seconds=tier["solver_seconds"],
                     image=image, training_manifest=release / tier["train_manifest"],
+                    **pre_opts,
                 )
             else:
                 freeze_opts = {}

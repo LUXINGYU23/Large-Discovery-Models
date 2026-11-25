@@ -17,7 +17,6 @@ import os
 from pathlib import Path
 import time
 
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
@@ -114,35 +113,43 @@ def _phi_and_grad(net, x_tensor):
     return phi, grad_norm
 
 
+def _validate_device(device):
+    dev_str = str(device).strip()
+    if "7" in dev_str:
+        raise ValueError("GPU 7 is reserved for loop embeddings and must not be used")
+    return dev_str
+
+
 def train_geoinr(X_b, y_b, w_b, X_c, center, extent, *, s_z, lam, seed,
-                 epochs=1000, domain_samples=2000, lr=1e-4, beta=100.0):
-    """Train GeoINR MLP on CPU and return a callable predict(points_xyz) -> 1D numpy float array."""
+                 epochs=1000, domain_samples=2000, lr=1e-4, beta=100.0, device="cpu"):
+    """Train GeoINR MLP on CPU or an explicitly free GPU and return predict(points_xyz)."""
+    dev_str = _validate_device(device)
     torch, nn, F = _get_torch()
     rng = np.random.default_rng(int(seed))
     torch_seed = int(rng.integers(0, 2 ** 31 - 1))
     torch.manual_seed(torch_seed)
 
-    device = torch.device("cpu")
-    net = build_geoinr_net(hidden_layers=3, hidden_dim=256, beta=beta).to(device)
+    dev = torch.device(dev_str)
+    net = build_geoinr_net(hidden_layers=3, hidden_dim=256, beta=beta).to(dev)
 
     Xb_n, box_half = _normalize_coords(X_b, center, extent, s_z)
     ore_mask = y_b > 0.5
     bar_mask = ~ore_mask
 
-    x_ore = torch.tensor(Xb_n[ore_mask], dtype=torch.float32, device=device)
-    w_ore = torch.tensor(w_b[ore_mask], dtype=torch.float32, device=device)
+    x_ore = torch.tensor(Xb_n[ore_mask], dtype=torch.float32, device=dev)
+    w_ore = torch.tensor(w_b[ore_mask], dtype=torch.float32, device=dev)
     w_ore = w_ore / torch.clamp(w_ore.sum(), min=1e-12)
 
-    x_bar = torch.tensor(Xb_n[bar_mask], dtype=torch.float32, device=device) if bar_mask.any() else None
+    x_bar = torch.tensor(Xb_n[bar_mask], dtype=torch.float32, device=dev) if bar_mask.any() else None
     w_bar = None
     if bar_mask.any():
-        w_bar = torch.tensor(w_b[bar_mask], dtype=torch.float32, device=device)
+        w_bar = torch.tensor(w_b[bar_mask], dtype=torch.float32, device=dev)
         w_bar = w_bar / torch.clamp(w_bar.sum(), min=1e-12)
 
     x_con = None
     if len(X_c):
         Xc_n, _ = _normalize_coords(X_c, center, extent, s_z)
-        x_con = torch.tensor(Xc_n, dtype=torch.float32, device=device)
+        x_con = torch.tensor(Xc_n, dtype=torch.float32, device=dev)
 
     n_ore = len(x_ore)
     n_bar = len(x_bar) if x_bar is not None else 0
@@ -156,7 +163,7 @@ def train_geoinr(X_b, y_b, w_b, X_c, center, extent, *, s_z, lam, seed,
     net.train()
     for _ in range(int(epochs)):
         u = rng.uniform(-1.0, 1.0, size=(int(domain_samples), 3)).astype(np.float32) * box_half_f32
-        x_dom = torch.from_numpy(u)
+        x_dom = torch.from_numpy(u).to(dev)
 
         parts = [x_ore]
         if n_bar:
@@ -202,7 +209,7 @@ def train_geoinr(X_b, y_b, w_b, X_c, center, extent, *, s_z, lam, seed,
         with torch.no_grad():
             out_chunks = []
             for start in range(0, len(pts_n), 8192):
-                xb = torch.tensor(pts_n[start:start + 8192], dtype=torch.float32, device=device)
+                xb = torch.tensor(pts_n[start:start + 8192], dtype=torch.float32, device=dev)
                 out_chunks.append(net(xb).cpu().numpy().astype(np.float64))
         return np.concatenate(out_chunks, axis=0) if out_chunks else np.zeros(0, dtype=np.float64)
 
@@ -222,8 +229,9 @@ def _limit_folds(folds, max_folds):
 
 
 def run_case(public_dir, out_dir, *, seed=0, cv_epochs=400, full_epochs=800,
-             domain_samples=1000, max_cv_folds=3, lr=1e-3, wall_budget_seconds=600.0):
+             domain_samples=1000, max_cv_folds=3, lr=1e-3, wall_budget_seconds=600.0, device="cpu"):
     """Run M7 Stage-A on one (public_dir, seed) and write field.npy + choice.json."""
+    dev_str = _validate_device(device)
     t0 = time.monotonic()
     out_dir = Path(out_dir)
     if (out_dir / "choice.json").is_file() and (
@@ -276,6 +284,7 @@ def run_case(public_dir, out_dir, *, seed=0, cv_epochs=400, full_epochs=800,
                         fold["X_b_tr"], fold["y_b_tr"], fold["w_b_tr"], fold["X_c_tr"],
                         data["center"], data["E"], s_z=cfg["s_z"], lam=cfg["lam"],
                         seed=fold_seed, epochs=cv_epochs, domain_samples=domain_samples, lr=lr,
+                        device=dev_str,
                     )
                     n_val = len(fold["X_val"])
                     f_both = harness.predict_chunked(pred_fn, np.vstack([fold["X_val"], data["S"]]))
@@ -325,6 +334,7 @@ def run_case(public_dir, out_dir, *, seed=0, cv_epochs=400, full_epochs=800,
                     data["X_b"], data["y_b"], data["w_b"], data["X_c"],
                     data["center"], data["E"], s_z=cfg["s_z"], lam=cfg["lam"],
                     seed=int(seed) * 10007 + i, epochs=full_epochs, domain_samples=domain_samples, lr=lr,
+                    device=dev_str,
                 )
                 f_grid = harness.predict_chunked(pred_fn, data["G"])
                 return i, f_grid.astype(np.float32)
@@ -392,8 +402,10 @@ def run_case(public_dir, out_dir, *, seed=0, cv_epochs=400, full_epochs=800,
 
 
 def _worker(task):
-    pub_dir, out_dir, seed, cv_ep, full_ep, dom_s, max_f, lr, budget_s = task
-    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+    pub_dir, out_dir, seed, cv_ep, full_ep, dom_s, max_f, lr, budget_s, dev_str = task
+    _validate_device(dev_str)
+    if dev_str == "cpu":
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
     os.environ.setdefault("OMP_NUM_THREADS", "1")
     os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
     os.environ.setdefault("MKL_NUM_THREADS", "1")
@@ -402,12 +414,14 @@ def _worker(task):
     return run_case(
         pub_dir, out_dir, seed=seed, cv_epochs=cv_ep, full_epochs=full_ep,
         domain_samples=dom_s, max_cv_folds=max_f, lr=lr, wall_budget_seconds=budget_s,
+        device=dev_str,
     )
 
 
 def run_split(release_dir, split, output_root, *, seeds=(0,), workers=8,
               cv_epochs=400, full_epochs=800, domain_samples=1000, max_cv_folds=3,
-              lr=1e-3, wall_budget_seconds=900.0):
+              lr=1e-3, wall_budget_seconds=900.0, device="cpu"):
+    dev_str = _validate_device(device)
     release_dir = Path(release_dir).resolve()
     manifest_path = release_dir / split / "manifest.json"
     manifest = json.loads(manifest_path.read_text())
@@ -416,7 +430,7 @@ def run_split(release_dir, split, output_root, *, seeds=(0,), workers=8,
             str(manifest_path.parent / c["public"]),
             str(Path(output_root) / split / c["case_id"] / str(int(s))),
             int(s), int(cv_epochs), int(full_epochs), int(domain_samples), int(max_cv_folds),
-            float(lr), float(wall_budget_seconds),
+            float(lr), float(wall_budget_seconds), dev_str,
         )
         for s in seeds
         for c in manifest["cases"]
@@ -437,9 +451,12 @@ def run_split(release_dir, split, output_root, *, seeds=(0,), workers=8,
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Run M7 GeoINR MLP Stage-A on public split inputs (CPU only).")
+    parser = argparse.ArgumentParser(description="Run M7 GeoINR MLP Stage-A on public split inputs.")
     parser.add_argument("--release", type=Path, required=True)
-    parser.add_argument("--split", required=True, choices=("calibration", "train", "validation", "test_id", "test_ood"))
+    parser.add_argument(
+        "--split", required=True,
+        choices=("calibration", "train", "train_s", "train_m", "validation", "test_id", "test_ood"),
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--seeds", default="0,1,2,3,4", help="Comma-separated integer seeds.")
     parser.add_argument("--workers", type=int, default=8)
@@ -449,13 +466,14 @@ def main(argv=None):
     parser.add_argument("--max-cv-folds", type=int, default=3)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--wall-budget-seconds", type=float, default=900.0)
+    parser.add_argument("--device", default="cpu", help="Torch device (cpu or free cuda:<id>, never GPU 7).")
     args = parser.parse_args(argv)
     seeds = [int(x.strip()) for x in args.seeds.split(",") if x.strip()]
     summary = run_split(
         args.release, args.split, args.output, seeds=seeds, workers=args.workers,
         cv_epochs=args.cv_epochs, full_epochs=args.full_epochs,
         domain_samples=args.domain_samples, max_cv_folds=args.max_cv_folds,
-        lr=args.lr, wall_budget_seconds=args.wall_budget_seconds,
+        lr=args.lr, wall_budget_seconds=args.wall_budget_seconds, device=args.device,
     )
     print(json.dumps(summary, sort_keys=True))
     return 0

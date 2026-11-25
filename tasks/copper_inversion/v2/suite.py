@@ -443,13 +443,17 @@ class SuiteEvaluator:
             if model_src.is_symlink() or file_hash(model_src)!=entry["sha256"]:
                 raise EvaluationPaused("frozen model changed")
             raw_problem=read_problem(self.manifest_path.parent/case["public"])
+            scored_problem=(raw_problem if raw_problem["objective_version"]==self.objective_version
+                            else {**raw_problem,"objective_version":self.objective_version})
             score_inputs=case_root/"input"
-            save_problem(raw_problem,score_inputs)
+            save_problem(scored_problem,score_inputs)
             wall_s=float(entry.get("wall_seconds",0.))
             row=dict(parent_id=case["parent_id"],case_id=case["case_id"],seed=seed,
                 status="failed",metrics={"iou":0.},solver_wall_seconds=wall_s,jobs=1,
                 solver_resources=None,error="invalid precomputed model")
             if self.objective!="confirmation":row["objective"]=self.objective
+            if self._explicit_objective_version or self.objective_version!=LEGACY_OBJECTIVE:
+                row["objective_version"]=self.objective_version
             try:
                 sha=freeze_model(model_src,case_root/"model",raw_problem["shape"])
             except OSError as exc:

@@ -275,7 +275,10 @@ def run_split(release_dir, split, output_root, *, seeds=(0, 1, 2, 3, 4), workers
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Run M8 Random-Forest Stage-A on public split inputs.")
     parser.add_argument("--release", type=Path, required=True)
-    parser.add_argument("--split", required=True, choices=("calibration", "train", "validation", "test_id", "test_ood"))
+    parser.add_argument(
+        "--split", required=True,
+        choices=("calibration", "train", "train_s", "train_m", "validation", "test_id", "test_ood"),
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--seeds", default="0,1,2,3,4", help="Comma-separated integer seeds.")
     parser.add_argument("--workers", type=int, default=8)

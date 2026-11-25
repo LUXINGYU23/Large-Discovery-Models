@@ -596,7 +596,10 @@ def run_split(release_dir, split, output_root, *, workers=4, wall_budget_seconds
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Run M4 GemPy Stage-A on public split inputs.")
     parser.add_argument("--release", type=Path, required=True)
-    parser.add_argument("--split", required=True, choices=("calibration", "train", "validation", "test_id", "test_ood"))
+    parser.add_argument(
+        "--split", required=True,
+        choices=("calibration", "train", "train_s", "train_m", "validation", "test_id", "test_ood"),
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--wall-budget-seconds", type=float, default=240.0)
