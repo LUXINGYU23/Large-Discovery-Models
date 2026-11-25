@@ -7,6 +7,7 @@ real v2 scoring functions. No Docker, sidecar or model is used.
 
 import hashlib
 import json
+import os
 import shutil
 from pathlib import Path
 from unittest.mock import patch
@@ -302,6 +303,16 @@ def test_hidden_iou_values_are_markers(tmp_path, train):
         scan_blind(run, service.root, require_requests=False)
     planted.write_text(f"only a rounded {value:.3f}")
     assert scan_blind(run, service.root, require_requests=False)["marker_hits"]["private_value"] == 0
+    # Written before the service scored that value: a coincidence, listed but not a leak.
+    planted.write_text(f"own loss {json.dumps(value)}")
+    first = min(p.stat().st_mtime for p in service.root.glob("evaluations/*/*.json"))
+    os.utime(planted, (first - 60, first - 60))
+    report = scan_blind(run, service.root, require_requests=False)
+    assert report["marker_hits"]["private_value"] == 0 and report["leaks"] == 0
+    assert report["private_value_predated"] == [{"path": str(planted.relative_to(run)), "values": 1}]
+    os.utime(planted, None)
+    with pytest.raises(ValueError, match="private_value"):
+        scan_blind(run, service.root, require_requests=False)
 
 
 @pytest.mark.parametrize("marker", ["truth", "confirmation", "parent"])

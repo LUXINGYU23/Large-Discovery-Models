@@ -110,6 +110,25 @@ def _private_values(private, min_digits=8):
     return sorted(t.encode() for t in texts if _significant(t) >= min_digits)
 
 
+def _private_value_times(private):
+    """Earliest time each hidden IoU value existed: the mtime of the evaluation files that first recorded it.
+    A public file last written before that time cannot carry the value from the service (N25 under
+    rsi-r2-h12-1bdf3e674e9143e8: an agent's own leave-one-out loss of p/1721 equalled a per-case IoU scored
+    6.5 h later)."""
+    first = {}
+    for path in sorted((private / "evaluations").glob("*/result.json")):
+        when, values = path.stat().st_mtime, [json.loads(path.read_text()).get("metrics", {}).get("mean_iou")]
+        cases = path.parent / "private-case-results.json"
+        if cases.is_file():
+            when = min(when, cases.stat().st_mtime)
+            values += [row.get("metrics", {}).get("iou") for row in json.loads(cases.read_text())]
+        for value in values:
+            if type(value) is float:
+                key = json.dumps(value).encode()
+                first[key] = min(first.get(key, when), when)
+    return first
+
+
 def _allowed_phrases(texts):
     """Task-description lines that mention IoU, raw and as JSON string content."""
     phrases = set()
@@ -156,7 +175,9 @@ def scan_blind(run, private, *, require_requests=True, private_manifest=None, ke
 
     Markers (sentinel, private parent IDs, truth-side file hashes, every hidden
     IoU value at full precision, the key) are searched in every file; any hit
-    fails the scan. Case-insensitive "iou" is searched in text files and every
+    fails the scan, except a hidden IoU value in a file last written before the
+    service first recorded that value (listed under private_value_predated, never
+    a leak by causality). Case-insensitive "iou" is searched in text files and every
     hit is listed with a classification. Task-description wording and ordinary
     English words are explained; the rest (an agent writing "IoU" in its notes)
     does not fail the scan but must be signed off before unsealing:
@@ -178,12 +199,21 @@ def scan_blind(run, private, *, require_requests=True, private_manifest=None, ke
     phrases = _allowed_phrases(texts)
     paths = sorted(path for path in run.rglob("*") if path.is_file() and not path.is_symlink())
     hits = {name: 0 for name in markers}
-    contaminated, iou_hits, binary = set(), [], 0
+    contaminated, iou_hits, binary, predated = set(), [], 0, []
+    times = _private_value_times(private)
     for path in paths:
         body = path.read_bytes()
         marked = False
         for name, values in markers.items():
-            found = sum(body.count(marker) for marker in values)
+            if name == "private_value":
+                present = [marker for marker in values if marker in body]
+                written = path.stat().st_mtime
+                late = [marker for marker in present if written >= times.get(marker, float("-inf"))]
+                if len(late) < len(present):
+                    predated.append({"path": str(path.relative_to(run)), "values": len(present) - len(late)})
+                found = sum(body.count(marker) for marker in late)
+            else:
+                found = sum(body.count(marker) for marker in values)
             if found:
                 hits[name] += found
                 contaminated.add(path)
@@ -201,7 +231,7 @@ def scan_blind(run, private, *, require_requests=True, private_manifest=None, ke
     review = [{"path": h["path"], "offset": h["offset"]} for h in iou_hits if h["kind"] == "unexplained"]
     result = {"status": "review_required" if review else "passed", "provider_requests_checked": len(requests),
               "files_checked": len(paths), "binary_files_marker_only": binary,
-              "marker_hits": hits, "iou_hits": iou_hits,
+              "marker_hits": hits, "private_value_predated": predated, "iou_hits": iou_hits,
               "iou_hits_by_kind": {kind: sum(h["kind"] == kind for h in iou_hits)
                                    for kind in ("task_description", "english_word", "identifier", "unexplained")},
               "leaks": len(contaminated), "review_required": len(review),
