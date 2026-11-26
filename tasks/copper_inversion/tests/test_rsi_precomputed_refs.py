@@ -385,3 +385,230 @@ def test_ref_export_outcomes_rows_csv_objective_v3_and_outcomes_loader(tmp_path,
     assert set(loaded.references) == {"initial", "potential_field"}
     assert loaded.sealed("REF", "initial", "full", "test_id") == by_id["initial"]["test_id_iou"]
     assert loaded.validation_value("REF", "potential_field", "full", "iou") == by_id["potential_field"]["validation_iou"]
+
+
+def test_wei2024_helpers_and_stage_b_loader(tmp_path):
+    from tasks.copper_inversion.experiments.baselines import prepare_ref, wei2024_reference
+    from tasks.copper_inversion.v2.geometry import canonicalize
+
+    rng = np.random.default_rng(47)
+    labels = rng.integers(0, 2, size=24).astype(float)
+    distances = rng.normal(0.0, 2.5, size=24)
+    contacts = rng.normal(0.1, 0.7, size=6)
+    weight = 0.35
+    upstream_formula = weight * (
+        np.sum(np.log(1.0 + np.exp(distances[labels == 0])) / np.log2(2.0))
+        + np.sum(np.log(1.0 + np.exp(-distances[labels == 1])) / np.log2(2.0))
+        + (np.mean(contacts) ** 2 + np.mean(contacts ** 2))
+    )
+    assert np.isclose(
+        wei2024_reference.finite_binary_loss(labels, distances, contacts, weight),
+        upstream_formula,
+        rtol=0,
+        atol=1e-12,
+    )
+    # Empty contacts (e.g. outcrop observations) and extreme distances stay finite without overflow or NaN.
+    val_empty_c = wei2024_reference.finite_binary_loss(
+        np.array([0.0, 1.0]), np.array([950.0, -950.0]), np.zeros(0), 0.1
+    )
+    assert np.isfinite(val_empty_c) and val_empty_c > 0.0
+
+    prob = fixture()
+    origin = np.asarray(prob["origin"], dtype=float)
+    spacing = np.asarray(prob["spacing"], dtype=float)
+    c000 = origin + 0.5 * spacing
+    c100 = origin + np.array([1.5, 0.5, 0.5]) * spacing
+    c200 = origin + np.array([2.5, 0.5, 0.5]) * spacing
+    obs = {
+        "name": "drill",
+        "points": np.array([c000, c000, c100, c100, c200, c200]),
+        "labels": np.array([1.0, 1.0, 1.0, 0.0, 0.0, 0.5]),
+    }
+    grid = wei2024_reference.obs_to_grid(prob, obs)
+    assert grid.shape == tuple(prob["shape"])
+    assert grid[0, 0, 0] == 1.0
+    assert grid[1, 0, 0] == 0.5  # tie -> 0.5
+    assert grid[2, 0, 0] == 0.5  # explicit contact overrides binary sample in same cell
+    assert np.isnan(grid[3, 3, 3])
+
+    # Stage-B loader and prepare_ref offline-only mode for wei2024.
+    release = tmp_path / "rel_wei"
+    manifests = _make_release_with_confirmations(release)
+    stage_a_root = tmp_path / "stage_a"
+    for split, m_path in manifests.items():
+        m = json.loads(m_path.read_text())
+        for c in m["cases"]:
+            p = fixture()
+            p["case_id"] = c["case_id"]
+            feasible = p["domain_mask"] & ~p["forbidden_mask"]
+            f_prob = np.where((model(p) > 0)[feasible], 0.8, 0.1).astype(np.float32)
+            cdir = stage_a_root / "wei2024" / split / c["case_id"] / "47"
+            cdir.mkdir(parents=True)
+            np.save(cdir / "field.npy", f_prob, allow_pickle=False)
+            (cdir / "choice.json").write_text(json.dumps({
+                "method": "wei2024",
+                "case_id": c["case_id"],
+                "seed": 47,
+                "no_ore": False,
+                "fallback": False,
+                "cv": {"selected_rule": "native", "selected_config": {"iter_num": 1000}, "cv_score": None, "cv_evaluated": 0},
+                "wall_seconds": 542.5,
+            }))
+
+    diag = {}
+    sample_prob = fixture()
+    sample_prob["case_id"] = json.loads(manifests["train"].read_text())["cases"][0]["case_id"]
+    out = offline_baselines.wei2024(
+        sample_prob, {"wall_time_seconds": 30}, seed=47,
+        fields_dir=stage_a_root / "wei2024", split="train", diagnostics=diag,
+    )
+    canonicalize(sample_prob, out)
+    assert diag["wall_seconds"] >= 542.5
+
+    refs_path = prepare_ref.prepare_ref_inputs(
+        release, stage_a_root, tmp_path / "ref2_inputs", tier="S",
+        in_container_names=(), offline_names=("wei2024",),
+    )
+    refs_data = json.loads(refs_path.read_text())
+    assert set(refs_data) == {"wei2024"}
+    assert "fields" in refs_data["wei2024"]
+
+
+def test_ref_and_ref2_independent_one_shot_unseal_and_merged_outcomes(tmp_path, monkeypatch):
+    from tasks.copper_inversion.experiments.baselines import prepare_ref
+    from tasks.copper_inversion.experiments.rsi.analysis.outcomes import Outcomes
+    from tasks.copper_inversion.experiments.rsi.unseal import unseal
+    from tasks.copper_inversion.tests.test_rsi_unseal import FakeSuite, fake_evaluator
+
+    root, manifests, _ = setup(tmp_path, ["ldm4geo-s101"], prefixes=(None,))
+    release = manifests["train"].parent.parent
+    import shutil
+    shutil.copytree(release / "train", release / "train_s")
+    tier = {
+        "train_manifest": "train_s/manifest.json",
+        "solver_seconds": 10,
+        "slots": 321,
+        "train_bodies": 4,
+        "validation_manifest": "validation/manifest.json",
+        "sealed_manifests": ["test_id/manifest.json", "test_ood/manifest.json"],
+    }
+    (release / "development-receipt.json").write_text(json.dumps({"tiers": {"S": tier}}))
+
+    stage_a_root = tmp_path / "stage_a"
+    prob = fixture()
+    for split_sub in ("train_s", "validation", "test_id", "test_ood"):
+        m = json.loads((release / split_sub / "manifest.json").read_text())
+        for c in m["cases"]:
+            feasible = prob["domain_mask"] & ~prob["forbidden_mask"]
+            f_prob = np.where((model(prob) > 0)[feasible], 0.85, 0.10).astype(np.float32)
+            cdir = stage_a_root / "wei2024" / split_sub / c["case_id"] / "47"
+            cdir.mkdir(parents=True)
+            np.save(cdir / "field.npy", f_prob, allow_pickle=False)
+            (cdir / "choice.json").write_text(json.dumps({
+                "method": "wei2024",
+                "case_id": c["case_id"],
+                "seed": 47,
+                "no_ore": False,
+                "fallback": False,
+                "cv": {"selected_rule": "native", "selected_config": {"iter_num": 1000}, "cv_score": None, "cv_evaluated": 0},
+                "wall_seconds": 550.0,
+            }))
+
+    ref1_path = prepare_ref.prepare_ref_inputs(
+        release, stage_a_root, tmp_path / "ref1_in", tier="S",
+        in_container_names=("initial",), offline_names=(),
+    )
+    ref2_path = prepare_ref.prepare_ref_inputs(
+        release, stage_a_root, tmp_path / "ref2_in", tier="S",
+        in_container_names=(), offline_names=("wei2024",),
+    )
+
+    def fake_eval_sources(svc_root, manifest, seconds, slots, image, sources, **kwargs):
+        from tasks.copper_inversion.core.candidate import seal
+        from tasks.copper_inversion.v2.suite import aggregate
+        svc_root = Path(svc_root)
+        svc_root.mkdir(parents=True, exist_ok=True)
+        train_m = json.loads(Path(manifest).read_text())
+        (svc_root / "identity.json").write_text(json.dumps({
+            "configuration": {"manifest": str(manifest), "seconds": seconds, "image": image},
+            "suite_digest": digest(train_m),
+        }))
+        for src_p, sha in sources:
+            seal(svc_root, Path(src_p).read_bytes())
+            ev = svc_root / "evaluations" / sha
+            rows = [
+                {"case_id": c["case_id"], "seed": 47, "parent_id": c["parent_id"], "solver_wall_seconds": 1.0,
+                 "status": "succeeded", "metrics": {"iou": 0.4, "confirmation_loss_total": 0.25}}
+                for c in train_m["cases"]
+            ]
+            for r in rows:
+                rp = ev / r["case_id"] / "47/receipt.json"
+                rp.parent.mkdir(parents=True, exist_ok=True)
+                rp.write_text(json.dumps(r))
+            (ev / "private-case-results.json").write_text(json.dumps(rows))
+            (ev / "result.json").write_text(json.dumps({
+                "candidate_id": sha, "status": "succeeded", "metrics": aggregate(rows),
+                "metadata": {"suite_digest": digest(train_m)},
+            }))
+        return svc_root
+
+    class _FakeSuiteKw(FakeSuite):
+        def __init__(self, root, execution, manifest, seconds, **kwargs):
+            super().__init__(root, execution, manifest, seconds)
+
+    monkeypatch.setattr(q1, "evaluate_sources", fake_eval_sources)
+    sel_ref1 = tmp_path / "sel_ref1"
+    sel_ref2 = tmp_path / "sel_ref2"
+    with fake_evaluator(), patch("tasks.copper_inversion.v2.selection.SuiteEvaluator", _FakeSuiteKw):
+        q1.build_references(ref1_path, release, sel_ref1, IMAGE,
+                            anonymize_cases=True, canonical_origin=True, randomize_orientation=True,
+                            objective_version="objective_v3")
+        q1.build_references(ref2_path, release, sel_ref2, IMAGE,
+                            anonymize_cases=True, canonical_origin=True, randomize_orientation=True,
+                            objective_version="objective_v3")
+
+        res1 = unseal_references(root, PID, ref1_path, sel_ref1 / "references.json",
+                                 operator="eval", experiment="REF")
+        assert res1 == {"status": "unsealed", "experiment": "REF", "references": 1}
+        with pytest.raises(ValueError, match="untested|already been unsealed"):
+            unseal_references(root, PID, ref1_path, sel_ref1 / "references.json", experiment="REF")
+
+        # Exporting REF2 before REF2 is unsealed is rejected even though REF is already unsealed!
+        with pytest.raises(ValueError, match="completed REF2 unseal log|tested frozen solver"):
+            export_outcomes.export_references(
+                root, PID, references=json.loads((sel_ref2 / "references.json").read_text()),
+                experiment="REF2",
+            )
+
+        # REF2 unseals cleanly once on the same (root, PID), then locks independently.
+        res2 = unseal_references(root, PID, ref2_path, sel_ref2 / "references.json",
+                                 operator="eval", experiment="REF2")
+        assert res2 == {"status": "unsealed", "experiment": "REF2", "references": 1}
+        with pytest.raises(ValueError, match="untested|already been unsealed"):
+            unseal_references(root, PID, ref2_path, sel_ref2 / "references.json", experiment="REF2")
+
+        unseal(root, {"experiment": "M1", "protocol_id": PID,
+                      "solvers": [{"run_id": "ldm4geo-s101", "prefix": "full"}]}, operator="eval")
+
+    outcomes_dir = tmp_path / "merged_exports"
+    outcomes_dir.mkdir()
+    assert export_outcomes.main([
+        "--root", str(root), "--protocol-id", PID, "--experiment", "M1",
+        "--output", str(outcomes_dir / "outcomes-M1.json"),
+    ]) == 0
+    assert export_outcomes.main([
+        "--root", str(root), "--protocol-id", PID, "--experiment", "REF",
+        "--references", str(sel_ref1 / "references.json"),
+        "--output", str(outcomes_dir / "outcomes-REF.json"),
+    ]) == 0
+    assert export_outcomes.main([
+        "--root", str(root), "--protocol-id", PID, "--experiment", "REF2",
+        "--references", str(sel_ref2 / "references.json"),
+        "--output", str(outcomes_dir / "outcomes-REF2.json"),
+    ]) == 0
+
+    loaded = Outcomes.load(outcomes_dir)
+    assert set(loaded.references) == {"initial", "wei2024"}
+    assert isinstance(loaded.sealed("REF", "initial", "full", "test_id"), float)
+    assert isinstance(loaded.sealed("REF2", "wei2024", "full", "test_id"), float)
+    assert isinstance(loaded.sealed("M1", "ldm4geo-s101", "full", "test_id"), float)

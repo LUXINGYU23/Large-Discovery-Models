@@ -63,7 +63,10 @@ OFFLINE_STAGE_A_SUBDIRS = {
     "potential_field": "gempy",
     "inr_mlp": "inr",
     "rf_xyz": "rf",
+    "wei2024": "wei2024",
 }
+
+REF_OFFLINE_DEFAULT = ("potential_field", "inr_mlp", "rf_xyz")
 
 REF_SOLVER_ORDER = (
     "initial",
@@ -91,7 +94,7 @@ def prepare_ref_inputs(release_dir, stage_a_root, output_dir, *, tier="S",
     output_dir.mkdir(parents=True, exist_ok=True)
 
     use_in = tuple(IN_CONTAINER_SOURCES) if in_container_names is None else tuple(in_container_names)
-    use_off = tuple(OFFLINE_STAGE_A_SUBDIRS) if offline_names is None else tuple(offline_names)
+    use_off = REF_OFFLINE_DEFAULT if offline_names is None else tuple(offline_names)
 
     entries = {}
     for name in use_in:
@@ -120,15 +123,30 @@ def prepare_ref_inputs(release_dir, stage_a_root, output_dir, *, tier="S",
     return refs_path
 
 
+def _parse_csv_list(raw):
+    if raw is None:
+        return None
+    return [x.strip() for x in raw.split(",") if x.strip()]
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--release", type=Path, required=True)
     parser.add_argument("--stage-a-root", type=Path, required=True,
-                        help="Directory containing gempy/, inr/, and rf/ Stage-A outputs.")
+                        help="Directory containing Stage-A outputs (gempy/, inr/, rf/, wei2024/).")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--tier", default="S")
+    parser.add_argument("--in-container", default=None,
+                        help="Optional comma-separated subset of in-container solver names (empty string for none).")
+    parser.add_argument("--offline", default=None,
+                        help="Optional comma-separated subset of offline solver names (e.g. wei2024).")
     args = parser.parse_args(argv)
-    refs_path = prepare_ref_inputs(args.release, args.stage_a_root, args.output, tier=args.tier)
+    in_names = _parse_csv_list(args.in_container)
+    off_names = _parse_csv_list(args.offline)
+    refs_path = prepare_ref_inputs(
+        args.release, args.stage_a_root, args.output, tier=args.tier,
+        in_container_names=in_names, offline_names=off_names,
+    )
     data = json.loads(refs_path.read_text())
     print(json.dumps({
         "status": "prepared",

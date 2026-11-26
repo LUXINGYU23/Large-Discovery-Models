@@ -15,7 +15,7 @@ import skfmm
 from . import baseline_harness as harness
 from .data import read_problem
 
-OFFLINE_SOLVER_NAMES = ("potential_field", "inr_mlp", "rf_xyz")
+OFFLINE_SOLVER_NAMES = ("potential_field", "inr_mlp", "rf_xyz", "wei2024")
 OFFLINE_NATIVE_SOLVER_NAMES = ("potential_field_native", "inr_mlp_native", "rf_xyz_native")
 
 
@@ -185,6 +185,16 @@ def rf_xyz_native(problem, budget=None, seed=0, *, fields_dir=None, split=None, 
     )
 
 
+def wei2024(problem, budget=None, seed=0, *, fields_dir=None, split=None,
+            decision_rule=None, diagnostics=None):
+    """Wei et al. (2024) 3-D level-set MCMC Stage-B loader (posterior mean >= 0.5)."""
+    del decision_rule
+    return _solve_offline(
+        "wei2024", 0.5 - 1e-9, False, problem, budget, seed,
+        fields_dir=fields_dir, split=split, decision_rule="native", diagnostics=diagnostics,
+    )
+
+
 OFFLINE_REFERENCE_SOLVERS = {
     "potential_field": potential_field,
     "potential_field_native": potential_field_native,
@@ -192,6 +202,7 @@ OFFLINE_REFERENCE_SOLVERS = {
     "inr_mlp_native": inr_mlp_native,
     "rf_xyz": rf_xyz,
     "rf_xyz_native": rf_xyz_native,
+    "wei2024": wei2024,
 }
 
 

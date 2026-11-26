@@ -32,7 +32,7 @@ import numpy as np
 from ldm_tts.engine.run_store import atomic_json_write
 from tasks.copper_inversion.core.execution import digest
 from tasks.copper_inversion.experiments.rsi.freeze import layout, parse_prefix, run_manifest
-from tasks.copper_inversion.experiments.rsi.unseal import check, load_list, _log
+from tasks.copper_inversion.experiments.rsi.unseal import REFERENCE_EXPERIMENTS, check, load_list, _log
 from tasks.copper_inversion.v2 import selection
 from tasks.copper_inversion.v2.suite import aggregate, file_hash, load_manifest, manifest_tiers, release_tiers
 from tasks.copper_inversion.v2.training_receipts import eligible
@@ -547,16 +547,17 @@ def _reference_tier(frozen):
 
 
 def export_references(root, protocol_id, *, q1=None, references=None, experiment="Q1"):
-    """The Q1 or REF table: tier/layout risks of Q1 programs and/or domain references.
+    """The Q1 or REF/REF2 table: tier/layout risks of Q1 programs and/or domain references.
 
     q1: {"short_12x1": service, "full_24x1": service, "short_24x2": service,
          "repeats": [service, ...]} (training service roots, extra execution seeds).
     references: {name: tested v2 selection root holding one reference solver}.
     """
-    if experiment not in ("Q1", "REF"):
-        raise ValueError("export_references supports experiment Q1 or REF")
-    if experiment == "REF" and (q1 is not None or not references):
-        raise ValueError("REF export requires --references without --q1")
+    allowed = ("Q1", *REFERENCE_EXPERIMENTS)
+    if experiment not in allowed:
+        raise ValueError(f"export_references supports experiment in {allowed}")
+    if experiment in REFERENCE_EXPERIMENTS and (q1 is not None or not references):
+        raise ValueError(f"{experiment} export requires --references without --q1")
     paths = layout(root, protocol_id, "Q1")
     table = {"schema": "rsi-outcomes-v1", "experiment": experiment, "protocol_id": protocol_id,
              "sealed": bool(references), "frozen_list_sha256": None,
@@ -591,11 +592,12 @@ def export_references(root, protocol_id, *, q1=None, references=None, experiment
         table["q1"] = {"programs": [{"program_id": sha, **{n: risks[n][sha] for n in names}} for sha in sorted(common)],
                        "repeats": repeats}
     if references:
+        unseal_exp = "REF" if experiment == "Q1" else experiment
         entries = [entry for entry in _log(paths["unseal_log"])
-                   if entry.get("experiment") == "REF" and entry.get("protocol_id") == protocol_id
+                   if entry.get("experiment") == unseal_exp and entry.get("protocol_id") == protocol_id
                    and entry.get("mode") == "completed"]
         if len(entries) != 1 or set(entries[0]["selection_roots"]) != set(references):
-            raise ValueError("references require a completed REF unseal log")
+            raise ValueError(f"references require a completed {unseal_exp} unseal log")
         logged = entries[0]
         table["references"] = {}
         rows, body_scores, strata_rows, validation_rows, orders = [], [], [], [], {}
@@ -610,16 +612,16 @@ def export_references(root, protocol_id, *, q1=None, references=None, experiment
                     or state["selection_sha256"] != logged["selection_sha256"][name]
                     or digest(result) != state["test_result_sha256"]
                     or digest(result) != logged["results_sha256"][name]):
-                raise ValueError("domain reference differs from REF unseal log")
+                raise ValueError(f"domain reference differs from {unseal_exp} unseal log")
             table["references"][name] = {r["split"]: r["metrics"]["mean_iou"] for r in result["results"]
                                          if r["split"] in SPLITS}
-            if experiment == "REF":
+            if experiment in REFERENCE_EXPERIMENTS:
                 val_seeds = load_manifest(frozen["manifests"][0]["path"])["seeds"]
                 seed_val = val_seeds[0] if len(val_seeds) == 1 else None
                 arm_name = ("offline_reference" if frozen["candidates"][0].get("kind") == "precomputed"
                             else "in_container_reference")
                 run_info = {
-                    "experiment": "REF",
+                    "experiment": experiment,
                     "protocol_id": protocol_id,
                     "run_id": name,
                     "arm": arm_name,
@@ -641,7 +643,7 @@ def export_references(root, protocol_id, *, q1=None, references=None, experiment
                 validated = validations([target])
                 validation_rows += [{"run_id": name, "program_id": s, **v} for s, v in sorted(validated.items())]
             targets.append(target)
-        if experiment == "REF":
+        if experiment in REFERENCE_EXPERIMENTS:
             table["rows"] = rows
             table["validations"] = validation_rows
             table["body_scores"] = body_scores
@@ -667,9 +669,9 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, required=True, help="outcomes JSON; a CSV is written beside it")
     parser.add_argument("--validation-only", action="store_true")
     parser.add_argument("--q1", type=Path, help="Q1 only: JSON of service roots (see export_references)")
-    parser.add_argument("--references", type=Path, help="Q1 or REF: JSON {name: tested selection root}")
+    parser.add_argument("--references", type=Path, help="Q1, REF or REF2: JSON {name: tested selection root}")
     args = parser.parse_args(argv)
-    if args.experiment in ("Q1", "REF"):
+    if args.experiment in ("Q1", *REFERENCE_EXPERIMENTS):
         load = lambda path: json.loads(path.read_text()) if path else None
         table = export_references(args.root, args.protocol_id, q1=load(args.q1),
                                   references=load(args.references), experiment=args.experiment)
