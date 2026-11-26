@@ -60,7 +60,7 @@ SITE_KEYS = frozenset({"root", "release", "source", "service_python", "client_py
                        "client_user", "image", "sidecar_image", "embedding_model_path", "harness_cache_dir",
                        "api_key_file", "policy", "public_catalogs"})
 SITE_OPTIONAL = frozenset({"embedding_devices", "load_qualification", "archive_root", "poll_seconds",
-                           "service_start_seconds"})
+                           "service_start_seconds", "machine_lock"})
 RUN_KEYS = frozenset({"arm", "judge", "seed"})
 CONTINUATION_KEYS = frozenset({"continuation", "mode", "replicate", "planted"})
 POLICY_REQUIRED = ("queue_root", "global_jobs", "interface_slots", "startup_slots", "jobs_per_process")
@@ -570,7 +570,7 @@ class Launcher:
     def machine(self):
         """One batch holds the machine (rules 3-4) while a command runs."""
         (self.root / "launcher").mkdir(parents=True, exist_ok=True)
-        with (self.root / "launcher" / "machine.lock").open("a+") as stream:
+        with (self.root / "launcher" / self.site.get("machine_lock", "machine.lock")).open("a+") as stream:
             try:
                 fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
