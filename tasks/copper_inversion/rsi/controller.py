@@ -25,6 +25,8 @@ import hashlib
 import json
 import math
 import os
+import re
+import shutil
 import tempfile
 import threading
 import time
@@ -58,6 +60,56 @@ SCHEDULING = frozenset({"evaluation_concurrency"})  # Config fields that never c
 
 def profile_name(branch):
     return f"researcher_{branch}"
+
+
+_REF_MODULE = re.compile(r"[A-Za-z][A-Za-z0-9_]{0,63}")
+
+
+def reference_library_paragraph(names):
+    listed = ", ".join(f"`reference_solvers/{name}.py`" for name in sorted(names))
+    return (
+        "Published reference implementations for this task contract are provided read-only in the "
+        f"session workspace ({listed}). They are standard baseline methods supplied without evaluation "
+        "scores or ranking; you may read, run, copy, adapt, and combine any parts of them when "
+        "developing candidate solvers."
+    )
+
+
+def write_reference_library(workspace, reference_library):
+    """Copy reference solvers read-only into <workspace>/reference_solvers/<name>.py."""
+    if not reference_library:
+        return
+    workspace = Path(workspace)
+    workspace.mkdir(parents=True, exist_ok=True)
+    dest = workspace / "reference_solvers"
+    if dest.is_symlink():
+        raise ValueError("reference_solvers cannot be a symlink")
+    if dest.exists():
+        dest.chmod(0o755)
+    else:
+        dest.mkdir(mode=0o755)
+    expected = {f"{name}.py" for name in reference_library}
+    for existing in list(dest.iterdir()):
+        if existing.is_symlink() or existing.is_dir() or existing.name not in expected:
+            if existing.is_dir() and not existing.is_symlink():
+                shutil.rmtree(existing)
+            else:
+                existing.unlink()
+    for name, body in sorted(reference_library.items()):
+        target = dest / f"{name}.py"
+        if target.exists():
+            if target.read_bytes() == body:
+                target.chmod(0o444)
+                continue
+            target.chmod(0o644)
+        with tempfile.NamedTemporaryFile(dir=dest, prefix=target.name + ".", suffix=".tmp", delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(body)
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.chmod(0o444)
+        os.replace(temporary, target)
+    dest.chmod(0o555)
 
 
 @dataclass(frozen=True)
@@ -415,16 +467,33 @@ class Controller:
     """Run or replay a campaign; each completed step has a durable receipt."""
 
     def __init__(self, root, config, agent, evaluator, select, task_brief, identity, intervention=None,
-                 start=None, forbidden_case_tokens=(), initial_source=INITIAL_SOURCE):
+                 start=None, forbidden_case_tokens=(), initial_source=INITIAL_SOURCE, reference_library=None):
         self.root, self.config = Path(root).resolve(), config
         self.agent, self.evaluator, self.select = agent, evaluator, select
-        self.task_brief = task_brief
         self.forbidden_case_tokens = frozenset(forbidden_case_tokens)
         if not isinstance(initial_source, bytes):
             raise ValueError("initial_source must be bytes")
         initial_sha = validate_source(initial_source)
         check_source_case_ids(initial_source, self.forbidden_case_tokens)
         self.initial_source = initial_source
+        self.reference_library = {}
+        if reference_library:
+            if not isinstance(reference_library, dict):
+                raise ValueError("reference_library must be a dict of {name: bytes}")
+            ref_hashes = {}
+            for name in sorted(reference_library):
+                body = reference_library[name]
+                if not isinstance(name, str) or _REF_MODULE.fullmatch(name) is None or not isinstance(body, bytes):
+                    raise ValueError(f"invalid reference_library entry: {name!r}")
+                ref_hashes[name] = validate_source(body)
+                check_source_case_ids(body, self.forbidden_case_tokens)
+                self.reference_library[name] = body
+            paragraph = reference_library_paragraph(self.reference_library)
+            if paragraph not in task_brief:
+                task_brief = task_brief.rstrip() + "\n\n" + paragraph + "\n"
+        else:
+            ref_hashes = None
+        self.task_brief = task_brief
         reason = unsupported(config.policy)
         if reason is not None:
             raise ValueError(f"controller does not implement {reason} (extension arm)")
@@ -436,16 +505,18 @@ class Controller:
             raise ValueError("invalid continuation start")
         self.start = start
         if {"schema", "config", "implementation_sha256", "task_brief_sha256", "intervention", "start",
-                "initial_source_sha256"} & set(identity):
+                "initial_source_sha256", "reference_library_sha256"} & set(identity):
             raise ValueError("run identity cannot override controller fields")
         scientific = {k: v for k, v in asdict(config).items() if k not in SCHEDULING}
         self.identity = {"schema": "rsi-controller-v2", "config": scientific,
                          "implementation_sha256": source_identity(),
-                         "task_brief_sha256": hashlib.sha256(task_brief.encode()).hexdigest(),
+                         "task_brief_sha256": hashlib.sha256(self.task_brief.encode()).hexdigest(),
                          "intervention": intervention_identity(self.intervention) if self.intervention else None,
                          **identity}
         if initial_source != INITIAL_SOURCE:
             self.identity["initial_source_sha256"] = initial_sha
+        if ref_hashes is not None:
+            self.identity["reference_library_sha256"] = ref_hashes
         if start is not None:
             self.identity["start"] = start.identity()
         self.ledger = self.root / "ledger.jsonl"
@@ -552,6 +623,8 @@ class Controller:
             root = self.turn_root(round_index, branch)
             _write_once(root / "briefs" / f"round_{round_index:02d}.json", text + "\n")
             write_view(root / "public" / "evidence", view, self.root)
+            if self.reference_library and not getattr(self.agent, "manages_session_workspace", False):
+                write_reference_library(root / "sessions" / profile_name(branch) / "workspace", self.reference_library)
             jobs[branch] = {"message": text, "view": view, "turn_root": root,
                             "sha": hashlib.sha256(text.encode()).hexdigest(),
                             "receipt": folder / f"branch_{branch}.json"}

@@ -28,7 +28,7 @@ from ..core.candidate import MAX_SOURCE_BYTES, validate_source
 from ..core.encoding import MAX_NORMALIZED_BYTES, normalized_code
 from ..v2.research import PublicTrainingExport
 from .case_isolation import check_source_case_ids, resolve_case_isolation
-from .controller import _validate_submission, profile_name, NoSubmission
+from .controller import _validate_submission, profile_name, NoSubmission, write_reference_library
 from .render import write_view
 from .usage import collect
 
@@ -173,8 +173,11 @@ def _exhausted_submission(error, turn_dir, profile):
 class PiAgent:
     """Real-model researcher; thread-safe per the contract in ``controller.py``."""
 
+    manages_session_workspace = True
+
     def __init__(self, *, public_catalog, api_key, sidecar_image, cache_dir, arm, reset_period,
-                 base_url, model, thinking, bash_calls, case_isolation=None):
+                 base_url, model, thinking, bash_calls, case_isolation=None,
+                 reference_library=None, task_brief=None):
         if not api_key:
             raise ValueError("protected model API key required")
         if type(bash_calls) is not int or bash_calls < 0:
@@ -188,6 +191,16 @@ class PiAgent:
             self.export = PublicTrainingExport(public_catalog)
         self.forbidden_case_tokens = (getattr(self.export, "forbidden_tokens", frozenset())
                                       if self.case_isolation["refuse_case_ids"] else frozenset())
+        self.reference_library = dict(sorted((reference_library or {}).items()))
+        for body in self.reference_library.values():
+            validate_source(body)
+            check_source_case_ids(body, self.forbidden_case_tokens)
+        if task_brief is None:
+            self.task_brief_bytes = (TOOL_RESOURCES / "TASK.md").read_bytes()
+        elif isinstance(task_brief, bytes):
+            self.task_brief_bytes = task_brief
+        else:
+            self.task_brief_bytes = task_brief.encode("utf-8")
         self.key, self.image, self.cache = api_key, sidecar_image, Path(cache_dir)
         self.arm, self.reset_period = arm, reset_period
         self.base_url, self.model, self.thinking, self.bash_calls = base_url, model, thinking, bash_calls
@@ -260,7 +273,7 @@ class PiAgent:
         turn_root.mkdir(parents=True, exist_ok=True)
         self.export(turn_root, None)
         public = turn_root / "public"
-        (public / "TASK.md").write_bytes((TOOL_RESOURCES / "TASK.md").read_bytes())
+        (public / "TASK.md").write_bytes(self.task_brief_bytes)
         write_view(public / "evidence", view, candidate_root)  # the controller wrote the same view
         run = Path(candidate_root).resolve().name
         config = self.config(profile=profile, run=run, epoch=epoch, seed=seed + branch, count=count,
@@ -300,6 +313,8 @@ class PiAgent:
         started = time.monotonic()
         client = self._client(profile, turn_root, config, container_name(turn_root, profile, run, epoch))
         try:
+            if self.reference_library:
+                write_reference_library(turn_root / "sessions" / profile / "workspace", self.reference_library)
             (result,) = client.run_turn((turn,), submission_validator=validate,
                                         recovery_timeout_seconds=2 * harness_seconds)
         except HarnessError as exc:

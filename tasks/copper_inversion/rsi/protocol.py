@@ -60,6 +60,7 @@ REQUIRED = {"protocol_version", "release", "tiers", "layout", "judges", "loop", 
             "token_cap_input", "arms", "seeds", "hashes", "decisions"}
 _HEX = re.compile(r"[0-9a-f]{64}")
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
+_MODULE = re.compile(r"[A-Za-z][A-Za-z0-9_]{0,63}")
 _PACK = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}")
 
 
@@ -176,6 +177,63 @@ def resolve_initial_program(protocol, *, repo=REPO):
     return body
 
 
+def validate_reference_library(spec):
+    if not isinstance(spec, dict) or set(spec) != {"dir", "files"}:
+        _fail("reference_library needs dir and files")
+    directory = Path(_text(spec["dir"], "reference_library.dir"))
+    if ".." in directory.parts:
+        _fail("reference_library.dir must not contain '..'")
+    files = spec["files"]
+    if not isinstance(files, dict) or not files:
+        _fail("reference_library.files must be a non-empty object")
+    for name, digest in files.items():
+        if not isinstance(name, str) or _MODULE.fullmatch(name) is None:
+            _fail(f"reference_library.files has invalid solver name {name!r}")
+        if not isinstance(digest, str) or _HEX.fullmatch(digest) is None:
+            _fail(f"reference_library.files.{name} must be a SHA-256")
+    return spec
+
+
+def resolve_reference_library(protocol, *, repo=REPO):
+    """Return validated {name: bytes} for protocol.reference_library ({} when omitted)."""
+    from ..core.candidate import validate_source
+    from ..core.encoding import MAX_NORMALIZED_BYTES, normalized_code
+    from .audit import IOU
+
+    if "reference_library" not in protocol:
+        return {}
+    spec = validate_reference_library(protocol["reference_library"])
+    raw_dir = Path(spec["dir"])
+    base = Path(repo).resolve()
+    target_dir = raw_dir if raw_dir.is_absolute() else (base / raw_dir)
+    if target_dir.is_symlink():
+        raise ValueError("reference_library.dir cannot be a symlink")
+    resolved_dir = target_dir.resolve()
+    if not raw_dir.is_absolute() and not resolved_dir.is_relative_to(base):
+        raise ValueError("reference_library.dir escapes repository")
+    if not resolved_dir.is_dir():
+        raise ValueError(f"reference_library directory not found: {spec['dir']}")
+    out = {}
+    for name, expected_sha in sorted(spec["files"].items()):
+        path = target_dir / f"{name}.py"
+        if path.is_symlink():
+            raise ValueError(f"reference_library file cannot be a symlink: {name}.py")
+        resolved = path.resolve()
+        if not resolved.is_relative_to(resolved_dir) or not resolved.is_file():
+            raise ValueError(f"reference_library file not found: {name}.py")
+        body = resolved.read_bytes()
+        digest = validate_source(body)
+        if digest != expected_sha:
+            raise ValueError(f"reference_library sha256 does not match file on disk: {name}.py")
+        size = len(normalized_code(body).encode("utf-8"))
+        if size > MAX_NORMALIZED_BYTES:
+            raise ValueError(f"reference_library {name}.py is {size} normalized bytes; limit is {MAX_NORMALIZED_BYTES}")
+        if IOU.search(body) is not None:
+            raise ValueError(f"reference_library {name}.py contains forbidden 'iou' substring")
+        out[name] = body
+    return out
+
+
 def validate_analysis(value):
     """Validate the complete G3-bound analysis subset without reading external data."""
     if not isinstance(value, dict) or set(value) != {"freeze_prefixes", "checkpoint_experiment", "checkpoint_round", "tagger"}:
@@ -248,6 +306,8 @@ def validate(protocol):
             _fail(str(exc))
     if "initial_program" in protocol:
         validate_initial_program(protocol["initial_program"])
+    if "reference_library" in protocol:
+        validate_reference_library(protocol["reference_library"])
     release = protocol["release"]
     if not isinstance(release, dict) or not {"name", "qualification_sha256"} <= set(release):
         _fail("release needs name and qualification_sha256")
@@ -547,6 +607,11 @@ def verify(protocol, current, *, skip=(), repo=REPO):
             resolve_initial_program(protocol, repo=repo)
         except ValueError as exc:
             raise ValueError("frozen protocol hashes no longer match: initial_program") from exc
+    if "reference_library" in protocol and "reference_library" not in skip:
+        try:
+            resolve_reference_library(protocol, repo=repo)
+        except ValueError as exc:
+            raise ValueError("frozen protocol hashes no longer match: reference_library") from exc
     if binding:
         raise ValueError("frozen protocol hashes no longer match: " + ", ".join(binding))
     return [name for name in wrong if name in RECORDED_ONLY]
@@ -603,6 +668,8 @@ def freeze(path, *, allow_pending=False, now=None, **sources):
             raise ValueError("a formal protocol must define a tier table")
     if "initial_program" in protocol:
         resolve_initial_program(protocol, repo=sources.get("repo") or REPO)
+    if "reference_library" in protocol:
+        resolve_reference_library(protocol, repo=sources.get("repo") or REPO)
     current = local_hashes(**sources)
     hashes = {}
     for name in HASH_FIELDS:

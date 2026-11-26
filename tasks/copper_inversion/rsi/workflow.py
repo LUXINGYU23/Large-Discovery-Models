@@ -21,7 +21,7 @@ from . import continuation as continuations, intervention as interventions, prot
 from .agent import PiAgent, RESOURCES
 from .arms import policy
 from .client import RiskClient
-from .controller import Config, Controller
+from .controller import Config, Controller, reference_library_paragraph
 from .integrity import shared_identity
 from .selection import select
 
@@ -197,6 +197,7 @@ def prepare(args):
     # the evaluator image by its launcher.
     protocols.verify(protocol, current, skip=protocols.IMAGE_FIELDS)
     initial_source = protocols.resolve_initial_program(protocol)
+    reference_library = protocols.resolve_reference_library(protocol)
     if "tiers" in protocol:
         if args.tier not in protocol["tiers"]:
             raise ValueError("tier is not defined by the protocol")
@@ -244,8 +245,14 @@ def prepare(args):
     }
     if "initial_program" in protocol:
         manifest["initial_program"] = dict(protocol["initial_program"])
+    if "reference_library" in protocol:
+        manifest["reference_library"] = {
+            "dir": protocol["reference_library"]["dir"],
+            "files": dict(protocol["reference_library"]["files"]),
+        }
     return {"protocol": protocol, "config": config, "solver_seconds": solver_seconds, "manifest": manifest,
-            "agent": agent_settings(protocol), "continuation": continued, "initial_source": initial_source}
+            "agent": agent_settings(protocol), "continuation": continued, "initial_source": initial_source,
+            "reference_library": reference_library}
 
 
 PROVIDER_PAUSE_EXIT_CODE = 75
@@ -325,6 +332,9 @@ def main(argv=None):
     if protocol["hashes"].get("sidecar_image") not in (None, sidecar_digest):
         raise ValueError("frozen protocol hashes no longer match: sidecar_image")
     brief = (RESOURCES / "rsi/TASK.md").read_text(encoding="utf-8")
+    reference_library = plan.get("reference_library", protocols.resolve_reference_library(protocol))
+    if reference_library:
+        brief = brief.rstrip() + "\n\n" + reference_library_paragraph(reference_library) + "\n"
     identity = {**plan["manifest"], "public_digest": public_digest, "sidecar_image": sidecar_digest,
                 "embedding_provenance_sha256": _file_hash(args.embedding_model_path / "provenance.json"),
                 "shared_implementation_sha256": _shared_implementation(),
@@ -334,19 +344,25 @@ def main(argv=None):
     key = args.api_key_file.read_text().strip()
     if not key:
         raise ValueError("protected model API key file is empty")
-    agent = pi_agent = PiAgent(public_catalog=args.public_catalog, api_key=key, sidecar_image=sidecar_digest,
-                               cache_dir=args.harness_cache_dir, arm=args.arm, reset_period=config.reset_period,
-                               case_isolation=isolation, **plan["agent"])
+    agent_kwargs = dict(public_catalog=args.public_catalog, api_key=key, sidecar_image=sidecar_digest,
+                        cache_dir=args.harness_cache_dir, arm=args.arm, reset_period=config.reset_period,
+                        case_isolation=isolation, **plan["agent"])
+    if reference_library:
+        agent_kwargs.update(reference_library=reference_library, task_brief=brief)
+    agent = pi_agent = PiAgent(**agent_kwargs)
     encoder = CodeEncoder(args.out_dir, "fusion", args.embedding_model_path, args.embedding_device)
     if args.checkpoint_round is not None:
         agent = continuations.CheckpointingAgent(agent, args.out_dir, args.checkpoint_round)
     start = continuations.continuation_start(continued["checkpoint"], continued["mode"]) if continued else None
     initial_source = plan.get("initial_source", protocols.resolve_initial_program(protocol))
+    controller_kwargs = dict(intervention=continued["intervention"] if continued else None, start=start,
+                             forbidden_case_tokens=pi_agent.forbidden_case_tokens,
+                             initial_source=initial_source)
+    if reference_library:
+        controller_kwargs["reference_library"] = reference_library
     controller = Controller(args.out_dir, config, agent, client,
                             lambda pool, rows, count: select(pool, rows, encoder, count), brief, identity,
-                            intervention=continued["intervention"] if continued else None, start=start,
-                            forbidden_case_tokens=pi_agent.forbidden_case_tokens,
-                            initial_source=initial_source)
+                            **controller_kwargs)
     try:
         if continued:
             result = continuations.run_continuation(controller, continued["checkpoint"], continued["mode"],
