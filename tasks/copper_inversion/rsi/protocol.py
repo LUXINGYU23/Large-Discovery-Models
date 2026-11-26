@@ -29,7 +29,7 @@ ANALYSIS = TASK / "experiments/rsi/analysis"
 TAGGER = ANALYSIS / "tagger.py"
 
 EXPERIMENTS = ("smoke", "rehearsal", "Q1", "M1", "E1", "E2", "E3", "X1", "F1",
-               "M0", "N25", "W25", "X4", "OR", "L40")
+               "M0", "N25", "W25", "X4", "OR", "L40", "WS")
 DEVELOPMENT_EXPERIMENTS = ("smoke", "rehearsal")
 DEVELOPMENT_RELEASE = "rsi-dev"
 HASH_FIELDS = ("task_brief", "renderer", "tool", "implementation", "evaluator_image",
@@ -136,6 +136,46 @@ def validate_strategy(config):
     return config
 
 
+def validate_initial_program(spec):
+    if not isinstance(spec, dict) or set(spec) != {"path", "sha256"}:
+        _fail("initial_program needs path and sha256")
+    path = Path(_text(spec["path"], "initial_program.path"))
+    if ".." in path.parts:
+        _fail("initial_program.path must not contain '..'")
+    if not isinstance(spec["sha256"], str) or _HEX.fullmatch(spec["sha256"]) is None:
+        _fail("initial_program.sha256 must be a SHA-256")
+    return spec
+
+
+def resolve_initial_program(protocol, *, repo=REPO):
+    """Return the validated round-0 solver bytes (built-in A0 when omitted)."""
+    from ..core.candidate import validate_source
+    from ..core.encoding import MAX_NORMALIZED_BYTES, normalized_code
+    from .controller import INITIAL_SOURCE
+
+    if "initial_program" not in protocol:
+        return INITIAL_SOURCE
+    spec = validate_initial_program(protocol["initial_program"])
+    raw = Path(spec["path"])
+    base = Path(repo).resolve()
+    target = raw if raw.is_absolute() else (base / raw)
+    if target.is_symlink():
+        raise ValueError("initial_program path cannot be a symlink")
+    resolved = target.resolve()
+    if not raw.is_absolute() and not resolved.is_relative_to(base):
+        raise ValueError("initial_program path escapes repository")
+    if not resolved.is_file():
+        raise ValueError(f"initial_program file not found: {spec['path']}")
+    body = resolved.read_bytes()
+    digest = validate_source(body)
+    if digest != spec["sha256"]:
+        raise ValueError("initial_program sha256 does not match file on disk")
+    size = len(normalized_code(body).encode("utf-8"))
+    if size > MAX_NORMALIZED_BYTES:
+        raise ValueError(f"initial_program is {size} normalized bytes; limit is {MAX_NORMALIZED_BYTES}")
+    return body
+
+
 def validate_analysis(value):
     """Validate the complete G3-bound analysis subset without reading external data."""
     if not isinstance(value, dict) or set(value) != {"freeze_prefixes", "checkpoint_experiment", "checkpoint_round", "tagger"}:
@@ -206,6 +246,8 @@ def validate(protocol):
             validate_case_isolation(protocol["case_isolation"])
         except ValueError as exc:
             _fail(str(exc))
+    if "initial_program" in protocol:
+        validate_initial_program(protocol["initial_program"])
     release = protocol["release"]
     if not isinstance(release, dict) or not {"name", "qualification_sha256"} <= set(release):
         _fail("release needs name and qualification_sha256")
@@ -496,10 +538,15 @@ def mismatches(protocol, current, *, skip=()):
 RECORDED_ONLY = ("implementation", "analysis")
 
 
-def verify(protocol, current, *, skip=()):
+def verify(protocol, current, *, skip=(), repo=REPO):
     """Refuse a binding hash that changed; return the recorded-only fields that drifted."""
     wrong = mismatches(protocol, current, skip=skip)
     binding = [name for name in wrong if name not in RECORDED_ONLY]
+    if "initial_program" in protocol and "initial_program" not in skip:
+        try:
+            resolve_initial_program(protocol, repo=repo)
+        except ValueError as exc:
+            raise ValueError("frozen protocol hashes no longer match: initial_program") from exc
     if binding:
         raise ValueError("frozen protocol hashes no longer match: " + ", ".join(binding))
     return [name for name in wrong if name in RECORDED_ONLY]
@@ -554,6 +601,8 @@ def freeze(path, *, allow_pending=False, now=None, **sources):
             raise ValueError("a formal protocol must name its release qualification record")
         if "tiers" not in protocol:
             raise ValueError("a formal protocol must define a tier table")
+    if "initial_program" in protocol:
+        resolve_initial_program(protocol, repo=sources.get("repo") or REPO)
     current = local_hashes(**sources)
     hashes = {}
     for name in HASH_FIELDS:

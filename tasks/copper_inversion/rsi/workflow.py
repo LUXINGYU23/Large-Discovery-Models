@@ -196,6 +196,7 @@ def prepare(args):
     # Image digests are checked where they can be resolved: the sidecar below,
     # the evaluator image by its launcher.
     protocols.verify(protocol, current, skip=protocols.IMAGE_FIELDS)
+    initial_source = protocols.resolve_initial_program(protocol)
     if "tiers" in protocol:
         if args.tier not in protocol["tiers"]:
             raise ValueError("tier is not defined by the protocol")
@@ -241,8 +242,10 @@ def prepare(args):
         "evaluator_image": protocol["hashes"].get("evaluator_image"),
         "case_isolation": protocols.case_isolation(protocol),
     }
+    if "initial_program" in protocol:
+        manifest["initial_program"] = dict(protocol["initial_program"])
     return {"protocol": protocol, "config": config, "solver_seconds": solver_seconds, "manifest": manifest,
-            "agent": agent_settings(protocol), "continuation": continued}
+            "agent": agent_settings(protocol), "continuation": continued, "initial_source": initial_source}
 
 
 PROVIDER_PAUSE_EXIT_CODE = 75
@@ -338,10 +341,12 @@ def main(argv=None):
     if args.checkpoint_round is not None:
         agent = continuations.CheckpointingAgent(agent, args.out_dir, args.checkpoint_round)
     start = continuations.continuation_start(continued["checkpoint"], continued["mode"]) if continued else None
+    initial_source = plan.get("initial_source", protocols.resolve_initial_program(protocol))
     controller = Controller(args.out_dir, config, agent, client,
                             lambda pool, rows, count: select(pool, rows, encoder, count), brief, identity,
                             intervention=continued["intervention"] if continued else None, start=start,
-                            forbidden_case_tokens=pi_agent.forbidden_case_tokens)
+                            forbidden_case_tokens=pi_agent.forbidden_case_tokens,
+                            initial_source=initial_source)
     try:
         if continued:
             result = continuations.run_continuation(controller, continued["checkpoint"], continued["mode"],

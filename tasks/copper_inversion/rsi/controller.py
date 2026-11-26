@@ -415,11 +415,16 @@ class Controller:
     """Run or replay a campaign; each completed step has a durable receipt."""
 
     def __init__(self, root, config, agent, evaluator, select, task_brief, identity, intervention=None,
-                 start=None, forbidden_case_tokens=()):
+                 start=None, forbidden_case_tokens=(), initial_source=INITIAL_SOURCE):
         self.root, self.config = Path(root).resolve(), config
         self.agent, self.evaluator, self.select = agent, evaluator, select
         self.task_brief = task_brief
         self.forbidden_case_tokens = frozenset(forbidden_case_tokens)
+        if not isinstance(initial_source, bytes):
+            raise ValueError("initial_source must be bytes")
+        initial_sha = validate_source(initial_source)
+        check_source_case_ids(initial_source, self.forbidden_case_tokens)
+        self.initial_source = initial_source
         reason = unsupported(config.policy)
         if reason is not None:
             raise ValueError(f"controller does not implement {reason} (extension arm)")
@@ -430,7 +435,8 @@ class Controller:
         if start is not None and (not isinstance(start, Start) or start.round > config.rounds):
             raise ValueError("invalid continuation start")
         self.start = start
-        if {"schema", "config", "implementation_sha256", "task_brief_sha256", "intervention", "start"} & set(identity):
+        if {"schema", "config", "implementation_sha256", "task_brief_sha256", "intervention", "start",
+                "initial_source_sha256"} & set(identity):
             raise ValueError("run identity cannot override controller fields")
         scientific = {k: v for k, v in asdict(config).items() if k not in SCHEDULING}
         self.identity = {"schema": "rsi-controller-v2", "config": scientific,
@@ -438,6 +444,8 @@ class Controller:
                          "task_brief_sha256": hashlib.sha256(task_brief.encode()).hexdigest(),
                          "intervention": intervention_identity(self.intervention) if self.intervention else None,
                          **identity}
+        if initial_source != INITIAL_SOURCE:
+            self.identity["initial_source_sha256"] = initial_sha
         if start is not None:
             self.identity["start"] = start.identity()
         self.ledger = self.root / "ledger.jsonl"
@@ -462,7 +470,7 @@ class Controller:
         rows = read(self.ledger)
         if self.start is None:
             if not rows:
-                payload = seal(self.root, INITIAL_SOURCE)
+                payload = seal(self.root, self.initial_source)
                 source = self.root / payload["source_path"]
                 self._record(self.evaluator.evaluate_source(source), round_index=0, branch=-1, reason="initial")
             return
