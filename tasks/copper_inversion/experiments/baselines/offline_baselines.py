@@ -1,19 +1,21 @@
-"""Stage-B loaders and legalisers for offline two-stage baselines (M4, M7, M8-RF).
+"""Stage-B loaders, legalisers, and calibration CLI for offline two-stage baselines (M4, M7, M8-RF).
 
-Stage-A scripts run in dedicated H20 Python environments (env/gempy for M4,
-env/embedding for M7 and M8-RF) on public inputs only and save raw fields plus
-choice.json metadata. Stage-B runs in the service environment, computes signed
-distance (for M4) or loads continuous fields (for M7/RF), applies the selected
-or native decision rule, and enforces contract legality via _enforce_legal.
+Kept under ``experiments/baselines`` rather than ``v2`` so candidate-visible
+runtime modules and ``PublicTrainingExport`` match the pilot checkout.
 """
 
+import argparse
+import inspect
 import json
 import time
 from pathlib import Path
 import numpy as np
 import skfmm
-from . import baseline_harness as harness
-from .data import read_problem
+from ...v2 import baseline_harness as harness
+from ...v2 import baselines as v2_baselines
+from ...v2.data import read_problem
+from ...v2.metrics import compare
+from .fdi_baseline import fdi_smooth, fdi_smooth_native
 
 OFFLINE_SOLVER_NAMES = ("potential_field", "inr_mlp", "rf_xyz")
 OFFLINE_NATIVE_SOLVER_NAMES = ("potential_field_native", "inr_mlp_native", "rf_xyz_native")
@@ -194,12 +196,19 @@ OFFLINE_REFERENCE_SOLVERS = {
     "rf_xyz_native": rf_xyz_native,
 }
 
+EXTENDED_REFERENCE_SOLVERS = {
+    **v2_baselines.REFERENCE_SOLVERS,
+    "fdi_smooth": fdi_smooth,
+    "fdi_smooth_native": fdi_smooth_native,
+    **OFFLINE_REFERENCE_SOLVERS,
+}
+
 
 def materialize_precomputed_reference(solver_name, stage_a_dir, release_dir, output_dir,
                                       *, splits=("train", "validation", "test_id", "test_ood"), tier=None):
     """Materialize Stage-B legal model.npy files on public inputs only and return precomputed_manifest sha256."""
     from ldm_tts.engine.run_store import atomic_json_write
-    from .selection import precomputed_manifest
+    from ...v2.selection import precomputed_manifest
     if solver_name not in OFFLINE_REFERENCE_SOLVERS:
         raise ValueError(f"unknown offline solver: {solver_name!r}")
     solver = OFFLINE_REFERENCE_SOLVERS[solver_name]
@@ -226,7 +235,6 @@ def materialize_precomputed_reference(solver_name, stage_a_dir, release_dir, out
         use_split = stage_a_sub if (stage_a_dir / stage_a_sub).is_dir() else target_split
         seeds = manifest["seeds"]
         for case in manifest["cases"]:
-            # Strictly read ONLY public problem files; never access case["truth"].
             problem = read_problem(manifest_path.parent / case["public"])
             for seed in seeds:
                 diag = {}
@@ -241,3 +249,107 @@ def materialize_precomputed_reference(solver_name, stage_a_dir, release_dir, out
 
     _, sha = precomputed_manifest(output_dir)
     return sha
+
+
+def evaluate_release(release_dir, split, solver_name, *, fields_dir=None, seed=0):
+    """Evaluate an extended or offline reference solver on a train or calibration split."""
+    if solver_name not in EXTENDED_REFERENCE_SOLVERS:
+        raise ValueError(f"unknown solver: {solver_name!r}")
+    manifest_path = v2_baselines._resolve_manifest(release_dir, split)
+    manifest = json.loads(manifest_path.read_text())
+    root = manifest_path.parent
+    families = v2_baselines._family_map(release_dir, split, manifest)
+    solver = EXTENDED_REFERENCE_SOLVERS[solver_name]
+    params = inspect.signature(solver).parameters
+    accepts_diag = "diagnostics" in params
+    accepts_fields = "fields_dir" in params
+    accepts_split = "split" in params
+    budget = {"wall_time_seconds": 120.0}
+    per_family, all_rows, case_times = {}, [], []
+    repaired_count, fallback_count = 0, 0
+    rule_counts, s_z_counts = {}, {}
+    started = time.monotonic()
+    for case in manifest["cases"]:
+        problem = read_problem(root / case["public"])
+        truth = np.load(root / case["truth"] / "truth.npy", allow_pickle=False)
+        diag = {}
+        kwargs = {}
+        if accepts_diag:
+            kwargs["diagnostics"] = diag
+        if accepts_fields and fields_dir is not None:
+            kwargs["fields_dir"] = fields_dir
+        if accepts_split:
+            kwargs["split"] = split
+        t0 = time.monotonic()
+        field = solver(problem, budget, int(seed), **kwargs)
+        elapsed = float(diag["wall_seconds"]) if (accepts_diag and "wall_seconds" in diag) else (time.monotonic() - t0)
+        case_times.append(elapsed)
+        stats = compare(problem, field, truth)
+        fam = families[case["case_id"]]
+        per_family.setdefault(fam, []).append(stats)
+        all_rows.append(stats)
+        if accepts_diag:
+            if diag.get("repaired"):
+                repaired_count += 1
+            if diag.get("fallback"):
+                fallback_count += 1
+            rule = diag.get("selected_rule")
+            if rule is not None:
+                rule_counts[str(rule)] = rule_counts.get(str(rule), 0) + 1
+            sz = diag.get("selected_s_z")
+            if sz is not None:
+                s_z_counts[str(sz)] = s_z_counts.get(str(sz), 0) + 1
+    wall = time.monotonic() - started
+
+    def summarize(items):
+        ious = [r["iou"] for r in items]
+        return {
+            "n": len(items),
+            "mean_iou": float(np.mean(ious)) if ious else 0.0,
+            "std_iou": float(np.std(ious)) if ious else 0.0,
+            "min_iou": float(np.min(ious)) if ious else 0.0,
+            "mean_surface_f1": float(np.mean([r["surface_f1"] for r in items])) if items else 0.0,
+            "mean_rel_vol_err": float(np.mean([r["relative_volume_error"] for r in items])) if items else 0.0,
+        }
+
+    by_family = {fam: summarize(per_family[fam]) for fam in sorted(per_family)}
+    family_macro_iou = float(np.mean([v["mean_iou"] for v in by_family.values()])) if by_family else 0.0
+    n_cases = len(all_rows)
+    return {
+        "release": str(Path(release_dir)),
+        "split": split,
+        "solver": solver_name,
+        "seed": int(seed),
+        "generator_matched": bool(solver_name in ("potential_field", "potential_field_native")),
+        "overall": summarize(all_rows),
+        "family_macro_iou": family_macro_iou,
+        "by_family": by_family,
+        "wall_seconds": round(float(sum(case_times)) if accepts_fields else wall, 3),
+        "median_case_seconds": round(float(np.median(case_times)), 3) if case_times else 0.0,
+        "repair_rate": (float(repaired_count) / n_cases) if (accepts_diag and n_cases) else None,
+        "fallback_count": fallback_count if accepts_diag else None,
+        "fallback_rate": (float(fallback_count) / n_cases) if (accepts_diag and n_cases) else None,
+        "rule_counts": rule_counts if accepts_diag else None,
+        "s_z_counts": s_z_counts if accepts_diag else None,
+    }
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Evaluate extended/offline reference solvers on train or calibration splits.")
+    parser.add_argument("--release", type=Path, required=True)
+    parser.add_argument("--split", choices=("train", "train_s", "calibration"), required=True)
+    parser.add_argument("--solver", choices=tuple(EXTENDED_REFERENCE_SOLVERS.keys()), required=True)
+    parser.add_argument("--fields-dir", type=Path, default=None)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    rep = evaluate_release(args.release, args.split, args.solver, fields_dir=args.fields_dir, seed=args.seed)
+    if args.json:
+        print(json.dumps(rep, indent=2, sort_keys=True))
+    else:
+        print(v2_baselines._format_table([rep]))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

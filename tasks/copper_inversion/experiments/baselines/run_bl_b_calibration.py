@@ -15,8 +15,8 @@ import time
 from pathlib import Path
 import numpy as np
 
-from tasks.copper_inversion.experiments.baselines import gempy_reference, inr_reference, rf_reference
-from tasks.copper_inversion.v2 import baselines, fdi_baseline
+from tasks.copper_inversion.experiments.baselines import fdi_baseline, gempy_reference, inr_reference, offline_baselines, rf_reference
+from tasks.copper_inversion.v2 import baselines
 from tasks.copper_inversion.v2.data import read_problem
 from tasks.copper_inversion.v2.metrics import compare
 
@@ -72,7 +72,7 @@ def _eval_one_case(task):
     os.environ.setdefault("MKL_NUM_THREADS", "1")
     os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
     pub_dir, truth_path, fam, solver_name, fields_dir, split, seed = task
-    solver = baselines.REFERENCE_SOLVERS[solver_name]
+    solver = offline_baselines.EXTENDED_REFERENCE_SOLVERS[solver_name]
     params = inspect.signature(solver).parameters
     problem = read_problem(pub_dir)
     truth = np.load(truth_path, allow_pickle=False)
@@ -98,7 +98,7 @@ def evaluate_release_parallel(release_dir, split, solver_name, *, fields_dir=Non
     manifest = json.loads(manifest_path.read_text())
     root = manifest_path.parent
     families = baselines._family_map(release_dir, split, manifest)
-    solver = baselines.REFERENCE_SOLVERS[solver_name]
+    solver = offline_baselines.EXTENDED_REFERENCE_SOLVERS[solver_name]
     params = inspect.signature(solver).parameters
     accepts_diag = "diagnostics" in params
     accepts_fields = "fields_dir" in params

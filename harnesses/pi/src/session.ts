@@ -199,7 +199,10 @@ export class PersistentProfileSession {
 			config.networkPolicy,
 			guestRuntime,
 			{ [WEB_EVIDENCE_GUEST]: this.contextPressure.archive.root,
-				...(config.solPi ? { [SOL_PI_GUEST_ARCHIVE]: join(this.sessionDirectory, "sol-pi") } : {}) },
+				...(config.solPi ? { [SOL_PI_GUEST_ARCHIVE]: join(this.sessionDirectory, "sol-pi") } : {}),
+				...Object.fromEntries(Object.entries(config.readOnlyWorkspaceMounts ?? {}).map(
+					([guest, host]) => [posix.join("/workspace", guest), resolve(host)],
+				)) },
 		);
 		this.mcp = new McpToolBridge(
 			config.mcpServers,
@@ -213,6 +216,10 @@ export class PersistentProfileSession {
 		if (this.forkSource) await initializeFork(join(this.config.artifactRoot, "fork-sources", this.profile.profileId),
 			this.profileRoot, this.forkSource);
 		await mkdir(this.workspace, { recursive: true });
+		for (const [guest, host] of Object.entries(this.config.readOnlyWorkspaceMounts ?? {})) {
+			await readdir(resolve(host));
+			await rm(join(this.workspace, guest), { recursive: true, force: true });
+		}
 		await mkdir(this.sessionDirectory, { recursive: true });
 		if (this.config.solPi) await mkdir(join(this.sessionDirectory, "sol-pi"), { recursive: true });
 		await mkdir(this.contextPressure.archive.root, { recursive: true });
@@ -749,6 +756,7 @@ export class PiSessionPool {
 			...(this.config.providerRequestBody ? { providerRequestBody: this.config.providerRequestBody } : {}),
 			...(this.config.solPi ? { solPi: this.config.solPi } : {}),
 			...(this.config.forkSources ? { forkSources: this.config.forkSources } : {}),
+			...(this.config.readOnlyWorkspaceMounts ? { readOnlyWorkspaceMounts: this.config.readOnlyWorkspaceMounts } : {}),
 			contextWindow: MODEL_CONTEXT_WINDOW,
 			compaction: COMPACTION_SETTINGS,
 			historyPolicy: { ...HISTORY_POLICY, summaryThinking: this.config.thinking },

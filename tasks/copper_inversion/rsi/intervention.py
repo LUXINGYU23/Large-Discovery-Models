@@ -228,7 +228,8 @@ def main(argv=None):
                 raise ValueError("protocol-bound selection does not accept a tagger override")
             if not protocols.is_development(protocol):
                 protocols.require_frozen(args.protocol, protocol)
-                protocols.verify(protocol, protocols.local_hashes(), skip=protocols.IMAGE_FIELDS + ("embedding_model",))
+                protocols.verify(protocol, protocols.local_hashes(protocol=protocol),
+                                 skip=protocols.IMAGE_FIELDS + ("embedding_model",))
             record = select_frozen(args.checkpoint, protocol)
             print(json.dumps(record, sort_keys=True))
             return 0

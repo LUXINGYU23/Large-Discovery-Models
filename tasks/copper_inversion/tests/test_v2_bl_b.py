@@ -8,9 +8,8 @@ import numpy as np
 import pytest
 
 from tasks.copper_inversion.core.runner import input_digest
-from tasks.copper_inversion.experiments.baselines import gempy_reference
+from tasks.copper_inversion.experiments.baselines import fdi_baseline, gempy_reference, offline_baselines
 from tasks.copper_inversion.v2 import baseline_harness as harness
-from tasks.copper_inversion.v2 import baselines, fdi_baseline, offline_baselines
 from tasks.copper_inversion.v2.contract import validate
 from tasks.copper_inversion.v2.data import canonical_problem, invert_orientation, save_problem
 from tasks.copper_inversion.v2.fixtures import fixtures
@@ -201,7 +200,7 @@ def test_offline_stage_b_loaders_and_cli(tmp_path, capsys):
         "native": {"selected_rule": "native", "selected_config": {"form": "L", "orient": "plane", "range": 1.7}, "cv_score": 0.9, "cv_evaluated": 12, "same_as_cv": True},
         "wall_seconds": 3.25,
     }))
-    assert baselines.main([
+    assert offline_baselines.main([
         "--release", str(release), "--split", "calibration", "--solver", "potential_field",
         "--fields-dir", str(tmp_path / "m4_fields"), "--json",
     ]) == 0
@@ -226,7 +225,7 @@ def test_offline_stage_b_loaders_and_cli(tmp_path, capsys):
             "native": {"selected_rule": "native", "selected_config": {"s_z": 4}, "cv_score": 0.82, "cv_evaluated": 6, "same_as_cv": True},
             "wall_seconds": 1.5,
         }))
-        assert baselines.main([
+        assert offline_baselines.main([
             "--release", str(release), "--split", "calibration", "--solver", method,
             "--fields-dir", str(tmp_path / f"{method}_fields"), "--seed", "2", "--json",
         ]) == 0

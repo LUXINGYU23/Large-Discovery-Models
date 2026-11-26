@@ -1,13 +1,14 @@
 """M5 Discrete smooth implicit interpolation (fdi_smooth) after Grose et al. (2021).
 
-In-container solver: imports only time, numpy, scipy, and v2 baseline_harness.
+Experiment/offline helper copy kept outside ``tasks/copper_inversion/v2`` so the
+candidate-visible runtime module set matches the pilot evaluator.
 """
 
 import time
 import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import LinearOperator, cg
-from . import baseline_harness as harness
+from ...v2 import baseline_harness as harness
 
 
 def _build_fdi_configs():

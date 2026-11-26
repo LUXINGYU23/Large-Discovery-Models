@@ -565,7 +565,19 @@ def image_digest(reference):
     return value
 
 
-def local_hashes(*, resources=None, task=None, repo=None, embedding_model_path=None,
+def effective_task_brief(protocol=None, *, resources=None):
+    """Exact UTF-8 task-brief bytes delivered to the agent, controller and brief audit."""
+    res = Path(resources or RESOURCES)
+    brief_path = res / "rsi/TASK.md"
+    if protocol is None or "reference_library" not in protocol:
+        return brief_path.read_bytes()
+    from .controller import reference_library_paragraph
+    spec = validate_reference_library(protocol["reference_library"])
+    base = brief_path.read_text(encoding="utf-8")
+    return (base.rstrip() + "\n\n" + reference_library_paragraph(spec["files"]) + "\n").encode("utf-8")
+
+
+def local_hashes(*, protocol=None, resources=None, task=None, repo=None, embedding_model_path=None,
                  analysis_dir=None, tagger_path=None, sidecar_image=None, evaluator_image=None):
     """Every component hash computable here; ``None`` marks a pending component."""
     resources, task, repo = Path(resources or RESOURCES), Path(task or TASK), Path(repo or REPO)
@@ -573,7 +585,7 @@ def local_hashes(*, resources=None, task=None, repo=None, embedding_model_path=N
     provenance = None if embedding_model_path is None else Path(embedding_model_path) / "provenance.json"
     analysis = _tree(analysis_dir, analysis_dir) if analysis_dir.is_dir() else {}
     return {
-        "task_brief": _file(resources / "rsi/TASK.md"),
+        "task_brief": hashlib.sha256(effective_task_brief(protocol, resources=resources)).hexdigest(),
         "renderer": sha256({name: _file(task / "rsi" / name) for name in ("render.py", "ledger.py")}),
         "tool": _file(resources / "rsi/rsi.mjs"),
         "implementation": implementation_identity(task, repo),
@@ -670,7 +682,7 @@ def freeze(path, *, allow_pending=False, now=None, **sources):
         resolve_initial_program(protocol, repo=sources.get("repo") or REPO)
     if "reference_library" in protocol:
         resolve_reference_library(protocol, repo=sources.get("repo") or REPO)
-    current = local_hashes(**sources)
+    current = local_hashes(protocol=protocol, **sources)
     hashes = {}
     for name in HASH_FIELDS:
         old = protocol["hashes"].get(name)
@@ -734,7 +746,7 @@ def main(argv=None):
         result = freeze(args.protocol, allow_pending=args.allow_pending, **sources)
     else:
         protocol = load(args.protocol)
-        current = local_hashes(**sources)
+        current = local_hashes(protocol=protocol, **sources)
         skip = [name for name in IMAGE_FIELDS + ("embedding_model",) if current[name] is None]
         verify(protocol, current, skip=skip)
         record = latest_record(args.protocol)

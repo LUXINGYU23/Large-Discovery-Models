@@ -56,6 +56,7 @@ class PiHarnessConfig(HarnessPoolConfig):
     force_first_tool_call: bool = True
     sol_pi: dict[str, Any] | None = None
     fork_sources: dict[str, PiForkSource] = field(default_factory=dict)
+    read_only_workspace_mounts: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.base_url.strip() or not self.model.strip():
@@ -66,6 +67,26 @@ class PiHarnessConfig(HarnessPoolConfig):
                 raise ValueError("forks cannot combine with SoL-Pi external state")
             if set(self.fork_sources) != {p.profile_id for p in self.profiles}:
                 raise ValueError("fork_sources must specify exactly the pool profiles")
+        if self.read_only_workspace_mounts:
+            if not isinstance(self.read_only_workspace_mounts, dict):
+                raise ValueError("read_only_workspace_mounts must be a mapping")
+            root = PurePosixPath(self.artifact_root)
+            reserved_guest = {".ldm-resources", ".web-evidence", ".sol-pi", "candidates"}
+            for guest_rel, container_src in self.read_only_workspace_mounts.items():
+                if (not isinstance(guest_rel, str)
+                        or re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}", guest_rel) is None
+                        or guest_rel in reserved_guest):
+                    raise ValueError(f"invalid read-only workspace mount target: {guest_rel!r}")
+                if not isinstance(container_src, str) or not container_src:
+                    raise ValueError(f"invalid read-only workspace mount source: {container_src!r}")
+                src_path = PurePosixPath(container_src)
+                if (not src_path.is_absolute() or ".." in src_path.parts
+                        or not src_path.is_relative_to(root) or src_path == root
+                        or src_path.is_relative_to(root / "sessions")
+                        or src_path.is_relative_to(root / "turns")):
+                    raise ValueError(
+                        "read-only workspace mount source must be inside artifact_root outside sessions and turns"
+                    )
         tool_names = [name for extension in self.tool_extensions for name in extension.tool_names]
         if len(set(tool_names)) != len(tool_names):
             raise ValueError("harness tool names must be unique across extensions")
@@ -132,6 +153,8 @@ class PiHarnessConfig(HarnessPoolConfig):
             **({"forceFirstToolCall": False} if not self.force_first_tool_call else {}),
             **({"solPi": self.sol_pi} if self.sol_pi is not None else {}),
             **({"forkSources": {k: v.to_dict() for k, v in self.fork_sources.items()}} if self.fork_sources else {}),
+            **({"readOnlyWorkspaceMounts": dict(sorted(self.read_only_workspace_mounts.items()))}
+               if self.read_only_workspace_mounts else {}),
         }
 
 

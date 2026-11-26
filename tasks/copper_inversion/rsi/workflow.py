@@ -21,7 +21,7 @@ from . import continuation as continuations, intervention as interventions, prot
 from .agent import PiAgent, RESOURCES
 from .arms import policy
 from .client import RiskClient
-from .controller import Config, Controller, reference_library_paragraph
+from .controller import Config, Controller
 from .integrity import shared_identity
 from .selection import select
 
@@ -192,7 +192,8 @@ def prepare(args):
     if args.experiment not in protocols.DEVELOPMENT_EXPERIMENTS:
         protocols.verify_analysis_reference(protocol)
         protocols.require_frozen(args.protocol, protocol)
-    current = protocols.local_hashes(resources=RESOURCES, embedding_model_path=args.embedding_model_path)
+    current = protocols.local_hashes(protocol=protocol, resources=RESOURCES,
+                                     embedding_model_path=args.embedding_model_path)
     # Image digests are checked where they can be resolved: the sidecar below,
     # the evaluator image by its launcher.
     protocols.verify(protocol, current, skip=protocols.IMAGE_FIELDS)
@@ -331,10 +332,9 @@ def main(argv=None):
         raise ValueError("sidecar image must resolve to an immutable digest")
     if protocol["hashes"].get("sidecar_image") not in (None, sidecar_digest):
         raise ValueError("frozen protocol hashes no longer match: sidecar_image")
-    brief = (RESOURCES / "rsi/TASK.md").read_text(encoding="utf-8")
+    brief_bytes = protocols.effective_task_brief(protocol, resources=RESOURCES)
+    brief = brief_bytes.decode("utf-8")
     reference_library = plan.get("reference_library", protocols.resolve_reference_library(protocol))
-    if reference_library:
-        brief = brief.rstrip() + "\n\n" + reference_library_paragraph(reference_library) + "\n"
     identity = {**plan["manifest"], "public_digest": public_digest, "sidecar_image": sidecar_digest,
                 "embedding_provenance_sha256": _file_hash(args.embedding_model_path / "provenance.json"),
                 "shared_implementation_sha256": _shared_implementation(),
@@ -348,7 +348,7 @@ def main(argv=None):
                         cache_dir=args.harness_cache_dir, arm=args.arm, reset_period=config.reset_period,
                         case_isolation=isolation, **plan["agent"])
     if reference_library:
-        agent_kwargs.update(reference_library=reference_library, task_brief=brief)
+        agent_kwargs.update(reference_library=reference_library, task_brief=brief_bytes)
     agent = pi_agent = PiAgent(**agent_kwargs)
     encoder = CodeEncoder(args.out_dir, "fusion", args.embedding_model_path, args.embedding_device)
     if args.checkpoint_round is not None:

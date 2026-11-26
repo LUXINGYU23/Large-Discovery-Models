@@ -14,7 +14,8 @@ from tasks.copper_inversion.experiments.rsi.freeze import layout
 from tasks.copper_inversion.experiments.rsi.unseal import unseal_references
 from tasks.copper_inversion.tests.test_rsi_unseal import IMAGE, PID, setup
 from tasks.copper_inversion.tests.test_v2_science import fixture, model
-from tasks.copper_inversion.v2 import offline_baselines, scorer, selection
+from tasks.copper_inversion.experiments.baselines import offline_baselines
+from tasks.copper_inversion.v2 import scorer, selection
 from tasks.copper_inversion.v2.data import save_problem
 from tasks.copper_inversion.v2.suite import file_hash
 from tasks.copper_inversion.v2.training_receipts import eligible

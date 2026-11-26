@@ -209,6 +209,7 @@ def test_noisy25_deterministic_per_key_fresh_across_keys_and_ranks_by_full_judge
 
     # Check the actual thinned confirmation holes on disk for A, A_replay, B, C.
     key_a = svc.evaluator.evaluation_attempt_usage_key(type("C", (), {"canonical_key": fb_a["source_sha256"]})())
+    tkey_a = svc.evaluator.case_transformation_key(type("C", (), {"canonical_key": fb_a["source_sha256"]})())
     key_b = svc.evaluator.evaluation_attempt_usage_key(type("C", (), {"canonical_key": fb_b["source_sha256"]})())
     key_c = svc.evaluator.evaluation_attempt_usage_key(type("C", (), {"canonical_key": fb_c["source_sha256"]})())
     assert key_a != key_b != key_c
@@ -222,7 +223,7 @@ def test_noisy25_deterministic_per_key_fresh_across_keys_and_ranks_by_full_judge
         raw_c0 = read_problem(train.parent / case["truth"] / "confirmation/c0")
         # Exact replay of thinned holes and matches manual thin_confirmation(raw_c0, seed, 0.25).
         np.testing.assert_array_equal(thinned_a["observations"][0]["points"], thinned_a_rep["observations"][0]["points"])
-        expected_thin, _ = thin_confirmation(raw_c0, confirmation_resample_seed(key_a, cid), 0.25, 4)
+        expected_thin, _ = thin_confirmation(raw_c0, confirmation_resample_seed(tkey_a, cid), 0.25, 4)
         np.testing.assert_array_equal(thinned_a["observations"][0]["points"], expected_thin["observations"][0]["points"])
         # Thinned has ~1/4 of 12 holes = 3 holes; full_confirmation retains all 12 holes.
         assert len(np.unique(thinned_a["observations"][0]["groups"])) == 3

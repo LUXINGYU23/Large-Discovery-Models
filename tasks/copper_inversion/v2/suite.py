@@ -390,8 +390,14 @@ class SuiteEvaluator:
         if self.confirmation_packs is not None:
             self.context["confirmation_packs"]=list(self.confirmation_packs) if isinstance(self.confirmation_packs,list) else self.confirmation_packs
 
+    PILOT_CASE_TRANSFORMATION_IMPLEMENTATION="77ef2d5f6d84409cc5507ff965faaef68bbcffd4369560f64abb99b876d94219"
+
     def evaluation_attempt_usage_key(self,candidate):
         return digest(dict(context=self.context,source=candidate.canonical_key))
+
+    def case_transformation_key(self,candidate):
+        return digest(dict(context={**self.context,"implementation":self.PILOT_CASE_TRANSFORMATION_IMPLEMENTATION},
+            source=candidate.canonical_key))
 
     def _prepare_score_truth(self,key,case,case_root):
         raw_truth=self.manifest_path.parent/case["truth"]
@@ -518,6 +524,7 @@ class SuiteEvaluator:
         if file_hash(source)!=candidate.canonical_key:raise EvaluationPaused("source changed")
         if self.slots is not None:self.slots.reserve(candidate.canonical_key)
         key=self.evaluation_attempt_usage_key(candidate)
+        tkey=self.case_transformation_key(candidate)
         root=self.root/"evaluations"/key;root.mkdir(parents=True,exist_ok=True)
         result_path=root/"result.json"
         if result_path.exists():return EvaluationResult(**json.loads(result_path.read_text()))
@@ -533,9 +540,9 @@ class SuiteEvaluator:
             raw_problem=read_problem(self.manifest_path.parent/case["public"])
             scored_problem=(raw_problem if raw_problem["objective_version"]==self.objective_version
                             else {**raw_problem,"objective_version":self.objective_version})
-            orientation=case_orientation(key,case["case_id"]) if self.randomize_orientation else 0
+            orientation=case_orientation(tkey,case["case_id"]) if self.randomize_orientation else 0
             if self.anonymize_cases or self.canonical_origin or orientation:
-                cid=opaque_case_id(key,case["case_id"]) if self.anonymize_cases else None
+                cid=opaque_case_id(tkey,case["case_id"]) if self.anonymize_cases else None
                 problem=canonical_problem(scored_problem,case_id=cid,canonical_origin=self.canonical_origin,
                                           orientation=orientation)
                 save_problem(problem,inputs)
@@ -579,7 +586,7 @@ class SuiteEvaluator:
                 except ValueError as exc:
                     row.update(status="invalid",error=str(exc))
                 else:
-                    score_truth=self._prepare_score_truth(key,case,case_root)
+                    score_truth=self._prepare_score_truth(tkey,case,case_root)
                     scoring=dict(identity=identity,model=sha,inputs=score_inputs,model_dir=case_root/"model",
                         truth=score_truth,row_path=row_path)
                     if merged:return row,scoring

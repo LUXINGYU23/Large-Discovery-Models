@@ -8,7 +8,9 @@ from ldm_tts.engine.run_store import atomic_json_write
 from tasks.copper_inversion.core.candidate import validate_source
 from tasks.copper_inversion.experiments.rsi import q1
 from tasks.copper_inversion.rsi.controller import INITIAL_SOURCE
-from tasks.copper_inversion.v2 import offline_baselines
+from tasks.copper_inversion.experiments.baselines import offline_baselines
+
+_FDI_STANDALONE = (Path(__file__).resolve().parents[2] / "resources/reference_solvers/fdi_smooth.py").read_bytes()
 
 IN_CONTAINER_SOURCES = {
     "initial": INITIAL_SOURCE,
@@ -52,11 +54,7 @@ IN_CONTAINER_SOURCES = {
         b"def solve(problem, budget, seed):\n"
         b"    return knn_idw(problem, budget, seed)\n"
     ),
-    "fdi_smooth": (
-        b"from tasks.copper_inversion.v2.fdi_baseline import fdi_smooth\n"
-        b"def solve(problem, budget, seed):\n"
-        b"    return fdi_smooth(problem, budget, seed)\n"
-    ),
+    "fdi_smooth": _FDI_STANDALONE,
 }
 
 OFFLINE_STAGE_A_SUBDIRS = {

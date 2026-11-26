@@ -1,3 +1,4 @@
+import { isAbsolute, posix, relative } from "node:path";
 import { sha256 } from "./trace.js";
 import { SIDECAR_RELEASE_VERSION } from "./release.js";
 
@@ -102,6 +103,7 @@ export interface InitializeFrame extends CommonFrame {
 	forceFirstToolCall?: boolean;
 	solPi?: Record<string, unknown>;
 	forkSources?: Record<string, ForkSource>;
+	readOnlyWorkspaceMounts?: Record<string, string>;
 	taskId: string;
 	caseId: string;
 	seed: number;
@@ -662,6 +664,7 @@ export function parseFrame(line: string): InputFrame {
 		...(data.forceFirstToolCall === undefined ? [] : ["forceFirstToolCall"]),
 		...(data.solPi === undefined ? [] : ["solPi"]),
 		...(data.forkSources === undefined ? [] : ["forkSources"]),
+		...(data.readOnlyWorkspaceMounts === undefined ? [] : ["readOnlyWorkspaceMounts"]),
 	], "frame");
 	const submissionContractJson = string(data.submissionContractJson, "submissionContractJson");
 	const submissionContractSha256 = digest(data.submissionContractSha256, "submissionContractSha256");
@@ -724,6 +727,41 @@ export function parseFrame(line: string): InputFrame {
 			};
 		}
 	}
+	const artifactRoot = string(data.artifactRoot, "artifactRoot");
+	if (!posix.isAbsolute(artifactRoot) || artifactRoot.split("/").includes("..")) {
+		throw new ProtocolError("invalid_frame", "artifactRoot must be a normalized absolute path");
+	}
+	let readOnlyWorkspaceMounts: InitializeFrame["readOnlyWorkspaceMounts"];
+	if (data.readOnlyWorkspaceMounts !== undefined) {
+		const rawMounts = record(data.readOnlyWorkspaceMounts, "readOnlyWorkspaceMounts");
+		const entries = Object.entries(rawMounts);
+		if (entries.length === 0) {
+			throw new ProtocolError("invalid_frame", "readOnlyWorkspaceMounts must be non-empty when present");
+		}
+		const reservedGuest = new Set([".ldm-resources", ".web-evidence", ".sol-pi", "candidates"]);
+		const normRoot = posix.normalize(artifactRoot);
+		readOnlyWorkspaceMounts = {};
+		for (const [guestRel, rawSrc] of entries) {
+			if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$/.test(guestRel) || reservedGuest.has(guestRel)) {
+				throw new ProtocolError("invalid_frame", `invalid readOnlyWorkspaceMounts key: ${guestRel}`);
+			}
+			const src = string(rawSrc, `readOnlyWorkspaceMounts.${guestRel}`);
+			if (!posix.isAbsolute(src) || src.split("/").includes("..")) {
+				throw new ProtocolError("invalid_frame", `invalid readOnlyWorkspaceMounts source: ${src}`);
+			}
+			const normSrc = posix.normalize(src);
+			const rel = posix.relative(normRoot, normSrc);
+			if (!rel || rel === ".." || rel.startsWith("../") || isAbsolute(rel)
+				|| rel === "sessions" || rel.startsWith("sessions/")
+				|| rel === "turns" || rel.startsWith("turns/")) {
+				throw new ProtocolError(
+					"invalid_frame",
+					"readOnlyWorkspaceMounts source must be inside artifactRoot outside sessions and turns",
+				);
+			}
+			readOnlyWorkspaceMounts[guestRel] = normSrc;
+		}
+	}
 	const solPi = data.solPi === undefined ? undefined : record(data.solPi, "solPi");
 	const toolExtensions = parseToolExtensions(data.toolExtensions);
 	const mcpServers = parseMcpServers(data.mcpServers);
@@ -750,7 +788,7 @@ export function parseFrame(line: string): InputFrame {
 	return {
 		...identity,
 		type: "initialize",
-		artifactRoot: string(data.artifactRoot, "artifactRoot"),
+		artifactRoot,
 		baseUrl: string(data.baseUrl, "baseUrl"),
 		wireApi: "responses",
 		model: string(data.model, "model"),
@@ -759,6 +797,7 @@ export function parseFrame(line: string): InputFrame {
 		...(data.forceFirstToolCall === undefined ? {} : { forceFirstToolCall: data.forceFirstToolCall }),
 		...(solPi === undefined ? {} : { solPi }),
 		...(forkSources === undefined ? {} : { forkSources }),
+		...(readOnlyWorkspaceMounts === undefined ? {} : { readOnlyWorkspaceMounts }),
 		taskId: string(data.taskId, "taskId"),
 		caseId: string(data.caseId, "caseId"),
 		seed: nonnegativeInteger(data.seed, "seed"),

@@ -608,11 +608,11 @@ def test_orientation_replay_invariance_and_fingerprinting_defeat(tmp_path):
         assert reply_on["risk"] == pytest.approx(reply_off["risk"], abs=1e-12)
 
         # Verify distinct orientations were applied across cases and differ for a second candidate program.
-        eval_key_1 = svc_on.evaluator.evaluation_attempt_usage_key(
+        eval_key_1 = svc_on.evaluator.case_transformation_key(
             type("C", (), {"canonical_key": reply_on["source_sha256"]})())
         seen_solver_inputs.clear()
         reply_on_2 = evaluate(svc_on, VALID + "# second program\n")
-        eval_key_2 = svc_on.evaluator.evaluation_attempt_usage_key(
+        eval_key_2 = svc_on.evaluator.case_transformation_key(
             type("C", (), {"canonical_key": reply_on_2["source_sha256"]})())
         o1 = [case_orientation(eval_key_1, c["case_id"]) for c in train_cases]
         o2 = [case_orientation(eval_key_2, c["case_id"]) for c in train_cases]
@@ -679,7 +679,7 @@ def test_orientation_replay_invariance_and_fingerprinting_defeat(tmp_path):
     assert mean_iou(svc_fp_on, r_fp_on) < 0.5
     assert r_fp_on["risk"] > r_fp_off["risk"] + 0.05
 
-    inv_key_on = svc_fp_on.evaluator.evaluation_attempt_usage_key(
+    inv_key_on = svc_fp_on.evaluator.case_transformation_key(
         type("C", (), {"canonical_key": r_inv_on["source_sha256"]})())
     inv_orients = [case_orientation(inv_key_on, c["case_id"]) for c in train_cases]
     assert any(o != 0 for o in inv_orients)

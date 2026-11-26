@@ -73,7 +73,7 @@ def load_config(path=None, protocol=None):
         protocols.require_analysis(p)
         if isinstance(protocol, (str, Path)):
             protocols.require_frozen(protocol, p)
-            protocols.verify(p, protocols.local_hashes(), skip=protocols.IMAGE_FIELDS + ("embedding_model",))
+            protocols.verify(p, protocols.local_hashes(protocol=p), skip=protocols.IMAGE_FIELDS + ("embedding_model",))
         missing = set(DEFAULTS) - {"freeze_prefixes", "checkpoint_experiment", "checkpoint_round", "tagger_rules", "family"} - set(supplied)
         if missing: raise ValueError("formal analysis needs explicit statistical configuration: " + ", ".join(sorted(missing)))
         bound_keys = {"freeze_prefixes", "checkpoint_experiment", "checkpoint_round", "tagger_rules", "family"}

@@ -241,8 +241,8 @@ class RiskOnlyService(EvaluatorService):
         if mode == "none":
             case_risks = {}
         elif mode == "opaque":
-            eval_key = self.evaluator.evaluation_attempt_usage_key(SimpleNamespace(canonical_key=sha))
-            case_risks = {opaque_case_id(eval_key, name): val for name, val in sorted(private_case_risks.items())}
+            tkey = self.evaluator.case_transformation_key(SimpleNamespace(canonical_key=sha))
+            case_risks = {opaque_case_id(tkey, name): val for name, val in sorted(private_case_risks.items())}
         else:
             case_risks = private_case_risks
         record = {**metrics, "source_sha256": sha, "status": status, "risk": metrics["loss_total"],

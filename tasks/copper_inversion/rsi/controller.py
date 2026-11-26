@@ -75,15 +75,14 @@ def reference_library_paragraph(names):
     )
 
 
-def write_reference_library(workspace, reference_library):
-    """Copy reference solvers read-only into <workspace>/reference_solvers/<name>.py."""
+def write_reference_library_dir(dest, reference_library):
+    """Write controller-owned reference solvers read-only into ``dest/<name>.py``."""
     if not reference_library:
         return
-    workspace = Path(workspace)
-    workspace.mkdir(parents=True, exist_ok=True)
-    dest = workspace / "reference_solvers"
+    dest = Path(dest)
     if dest.is_symlink():
         raise ValueError("reference_solvers cannot be a symlink")
+    dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists():
         dest.chmod(0o755)
     else:
@@ -110,6 +109,13 @@ def write_reference_library(workspace, reference_library):
         temporary.chmod(0o444)
         os.replace(temporary, target)
     dest.chmod(0o555)
+
+
+def write_reference_library(workspace, reference_library):
+    """Copy reference solvers read-only into <workspace>/reference_solvers/<name>.py."""
+    if not reference_library:
+        return
+    write_reference_library_dir(Path(workspace) / "reference_solvers", reference_library)
 
 
 @dataclass(frozen=True)

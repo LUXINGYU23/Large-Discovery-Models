@@ -28,7 +28,7 @@ from ..core.candidate import MAX_SOURCE_BYTES, validate_source
 from ..core.encoding import MAX_NORMALIZED_BYTES, normalized_code
 from ..v2.research import PublicTrainingExport
 from .case_isolation import check_source_case_ids, resolve_case_isolation
-from .controller import _validate_submission, profile_name, NoSubmission, write_reference_library
+from .controller import _validate_submission, profile_name, NoSubmission, write_reference_library_dir
 from .render import write_view
 from .usage import collect
 
@@ -213,12 +213,14 @@ class PiAgent:
 
     def config(self, *, profile, run, epoch, seed, count, harness_seconds, fork_sources=None):
         """Constant for one (run, epoch, profile): the sidecar refuses a changed identity on a reused root."""
+        ro_mounts = {"reference_solvers": "/artifacts/reference_solvers"} if self.reference_library else {}
         return PiHarnessConfig(
             artifact_root=Path("/artifacts"),
             profiles=(HarnessProfile(profile, GUEST_RESOURCES / "AGENTS.md", agents_sha256=self.agents_sha256),),
             campaign_id=f"rsi-{run}-e{epoch:02d}-{profile}", task_id="copper_inversion",
             case_id="public-training", seed=seed, submission_contract=submission_contract(count),
             fork_sources=dict(fork_sources or {}),
+            read_only_workspace_mounts=ro_mounts,
             base_url=self.base_url, model=self.model, thinking=self.thinking, force_first_tool_call=False,
             guest_runtime=self.guest_runtime,
             tool_extensions=(HarnessToolExtension(GUEST_RESOURCES / "rsi.mjs", self.tool_sha256,
@@ -310,11 +312,11 @@ class PiAgent:
             return HarnessSubmissionValidation("retry", (HarnessSubmissionError(
                 "/candidates", "invalid_solver", reason),))
 
+        if self.reference_library:
+            write_reference_library_dir(turn_root / "reference_solvers", self.reference_library)
         started = time.monotonic()
         client = self._client(profile, turn_root, config, container_name(turn_root, profile, run, epoch))
         try:
-            if self.reference_library:
-                write_reference_library(turn_root / "sessions" / profile / "workspace", self.reference_library)
             (result,) = client.run_turn((turn,), submission_validator=validate,
                                         recovery_timeout_seconds=2 * harness_seconds)
         except HarnessError as exc:
