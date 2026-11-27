@@ -350,3 +350,47 @@ def fdi_smooth(problem, budget=None, seed=0, *, decision_rule=None, diagnostics=
 def fdi_smooth_native(problem, budget=None, seed=0, *, diagnostics=None):
     """M5 fdi_smooth with decision rule forced to native."""
     return fdi_smooth(problem, budget, seed, decision_rule="native", diagnostics=diagnostics)
+
+
+FDI_DEFAULT_CONFIG = FDI_CONFIGS[0]
+FDI_SIGN_FALLBACK_CONFIG = {"s_z": 4, "lam": 0.1, "target": "sign"}
+
+
+def fdi_smooth_default(problem, budget=None, seed=0, *, diagnostics=None):
+    """M5 default: full-grid discrete smooth implicit interpolation (s_z=4, lam=0.1, sdf), native u > 0, no CV."""
+    del budget, seed
+    started = time.monotonic()
+    data = harness.extract_public_data(problem)
+    if not (data["y_b"] > 0.5).any():
+        return harness.no_ore_fallback(problem, data, diagnostics=diagnostics, started=started)
+
+    for cfg in (FDI_DEFAULT_CONFIG, FDI_SIGN_FALLBACK_CONFIG):
+        try:
+            X_full, v_full, w_full = _targets_for_problem(
+                problem, cfg["target"], cfg["s_z"], data["center"], data["h_hole"]
+            )
+            u_full, _, _, _ = fit_fdi_grid(
+                X_full, v_full, w_full, data["origin"], data["spacing"], data["shape"],
+                s_z=cfg["s_z"], lam=cfg["lam"], coarse=False, rtol=1e-7,
+            )
+            f = u_full.reshape(data["shape"])[data["feasible"]]
+            return harness.finalize_field(
+                problem,
+                data,
+                f,
+                0.0,
+                "native",
+                selected_config=cfg,
+                cv_score=None,
+                cv_evaluated=0,
+                deadline_stopped=False,
+                diagnostics=diagnostics,
+                started=started,
+            )
+        except Exception:
+            continue
+
+    return harness.stretched_fallback(
+        problem, data, diagnostics=diagnostics, started=started,
+        cv_evaluated=0, deadline_stopped=False, default_mode=True,
+    )

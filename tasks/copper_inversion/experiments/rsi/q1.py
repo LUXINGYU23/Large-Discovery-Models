@@ -66,15 +66,22 @@ def references(path):
     for name, item in sorted(data.items()):
         if not isinstance(name, str) or not name or not isinstance(item, dict):
             raise ValueError("invalid reference entry")
-        if set(item) == {"source", "sha256"}:
+        seed = item.get("seed")
+        if "seed" in item and (type(seed) is not int or seed < 0):
+            raise ValueError("invalid reference seed")
+        keys = set(item) - {"seed"}
+        if keys == {"source", "sha256"}:
             source = Path(item["source"])
             if not source.is_absolute():
                 source = path.parent / source
             source = source.resolve()
             if file_hash(source) != item["sha256"] or validate_source(source.read_bytes()) != item["sha256"]:
                 raise ValueError("reference source hash differs")
-            out[name] = {"source": str(source), "sha256": item["sha256"]}
-        elif set(item) == {"fields", "sha256"}:
+            entry = {"source": str(source), "sha256": item["sha256"]}
+            if seed is not None:
+                entry["seed"] = seed
+            out[name] = entry
+        elif keys == {"fields", "sha256"}:
             fields_dir = Path(item["fields"])
             if not fields_dir.is_absolute():
                 fields_dir = path.parent / fields_dir
@@ -82,7 +89,10 @@ def references(path):
             _, sha = selection.precomputed_manifest(fields_dir)
             if sha != item["sha256"]:
                 raise ValueError("reference fields hash differs")
-            out[name] = {"fields": str(fields_dir), "sha256": sha}
+            entry = {"fields": str(fields_dir), "sha256": sha}
+            if seed is not None:
+                entry["seed"] = seed
+            out[name] = entry
         else:
             raise ValueError("invalid reference entry")
     return out
@@ -231,7 +241,12 @@ def build_references(refs_path, release, output, image, *, policy=None, anonymiz
         kwargs["objective_version"] = objective_version
     if policy is not None:
         kwargs["policy"] = policy
-    source_entries = [(r["source"], r["sha256"]) for r in refs.values() if "source" in r]
+    seen_shas = set()
+    source_entries = []
+    for r in refs.values():
+        if "source" in r and r["sha256"] not in seen_shas:
+            seen_shas.add(r["sha256"])
+            source_entries.append((r["source"], r["sha256"]))
     service = None
     if source_entries:
         service = evaluate_sources(output / "training", release / tier["train_manifest"], tier["solver_seconds"],
@@ -261,6 +276,8 @@ def build_references(refs_path, release, output, image, *, policy=None, anonymiz
                     freeze_opts["randomize_orientation"] = True
                 if objective_version is not None:
                     freeze_opts["objective_version"] = objective_version
+                if "seed" in ref:
+                    freeze_opts["seed_override"] = ref["seed"]
                 selection.freeze(target, [ref["source"]], release / tier["validation_manifest"],
                                  [release / p for p in tier["sealed_manifests"]], seconds=tier["solver_seconds"],
                                  image=image, training_run=service, training_manifest=release / tier["train_manifest"],

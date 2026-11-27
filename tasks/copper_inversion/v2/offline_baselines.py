@@ -17,6 +17,12 @@ from .data import read_problem
 
 OFFLINE_SOLVER_NAMES = ("potential_field", "inr_mlp", "rf_xyz", "wei2024")
 OFFLINE_NATIVE_SOLVER_NAMES = ("potential_field_native", "inr_mlp_native", "rf_xyz_native")
+OFFLINE_DEFAULT_SOLVER_NAMES = (
+    "potential_field_default",
+    "inr_mlp_default",
+    "rf_xyz_default",
+    "wei2024_default",
+)
 
 
 def resolve_stage_a_dir(fields_dir, case_id, *, seed=0, split=None):
@@ -88,13 +94,20 @@ def _solve_offline(method_name, tau0, is_mask, problem, budget=None, seed=0, *,
             diagnostics["wall_seconds"] = stage_a_wall + float(time.monotonic() - t0)
         return out
 
-    force_native = decision_rule == "native"
-    block = choice.get("native" if force_native and "native" in choice else "cv", choice)
+    force_default = decision_rule == "default"
+    force_native = decision_rule in ("native", "default")
+    if force_default and "default" in choice:
+        block = choice["default"]
+    elif force_native and "native" in choice:
+        block = choice["native"]
+    else:
+        block = choice.get("cv", choice)
     if block.get("fallback") or choice.get("fallback"):
         out = harness.stretched_fallback(
             problem, data, diagnostics=diagnostics, started=t0,
             cv_evaluated=int(block.get("cv_evaluated", choice.get("cv_evaluated", 0))),
             deadline_stopped=bool(choice.get("deadline_stopped", False)),
+            default_mode=force_default,
         )
         if diagnostics is not None:
             diagnostics["wall_seconds"] = stage_a_wall + float(time.monotonic() - t0)
@@ -103,7 +116,7 @@ def _solve_offline(method_name, tau0, is_mask, problem, budget=None, seed=0, *,
     rule = "native" if force_native else str(block.get("selected_rule", "share"))
     if decision_rule == "share":
         rule = "share"
-    use_native_file = force_native and not bool(block.get("same_as_cv", True))
+    use_native_file = (decision_rule == "native") and not bool(block.get("same_as_cv", True))
     if is_mask:
         fname = "ore_native.npy" if use_native_file and (case_dir / "ore_native.npy").is_file() else "ore.npy"
         raw = np.load(case_dir / fname, allow_pickle=False)
@@ -195,19 +208,56 @@ def wei2024(problem, budget=None, seed=0, *, fields_dir=None, split=None,
     )
 
 
+def potential_field_default(problem, budget=None, seed=0, *, fields_dir=None, split=None, diagnostics=None):
+    """M4 GemPy potential_field with fixed library defaults (form='L', orient='plane', range=1.7), native rule."""
+    return potential_field(
+        problem, budget, seed, fields_dir=fields_dir, split=split,
+        decision_rule="default", diagnostics=diagnostics,
+    )
+
+
+def inr_mlp_default(problem, budget=None, seed=0, *, fields_dir=None, split=None, diagnostics=None):
+    """M7 GeoINR-style MLP with fixed published defaults (3x256 Softplus, lam=0.1, s_z=4), native phi > 0."""
+    return inr_mlp(
+        problem, budget, seed, fields_dir=fields_dir, split=split,
+        decision_rule="default", diagnostics=diagnostics,
+    )
+
+
+def rf_xyz_default(problem, budget=None, seed=0, *, fields_dir=None, split=None, diagnostics=None):
+    """M8 Random Forest with sklearn defaults (100 trees, min_samples_leaf=1, max_features='sqrt', s_z=4), p > 0.5."""
+    return rf_xyz(
+        problem, budget, seed, fields_dir=fields_dir, split=split,
+        decision_rule="default", diagnostics=diagnostics,
+    )
+
+
+def wei2024_default(problem, budget=None, seed=0, *, fields_dir=None, split=None, diagnostics=None):
+    """Wei et al. (2024) 3-D level-set MCMC with upstream defaults (1,000 steps, mean >= 0.5)."""
+    return _solve_offline(
+        "wei2024", 0.5 - 1e-9, False, problem, budget, seed,
+        fields_dir=fields_dir, split=split, decision_rule="default", diagnostics=diagnostics,
+    )
+
+
 OFFLINE_REFERENCE_SOLVERS = {
     "potential_field": potential_field,
     "potential_field_native": potential_field_native,
+    "potential_field_default": potential_field_default,
     "inr_mlp": inr_mlp,
     "inr_mlp_native": inr_mlp_native,
+    "inr_mlp_default": inr_mlp_default,
     "rf_xyz": rf_xyz,
     "rf_xyz_native": rf_xyz_native,
+    "rf_xyz_default": rf_xyz_default,
     "wei2024": wei2024,
+    "wei2024_default": wei2024_default,
 }
 
 
 def materialize_precomputed_reference(solver_name, stage_a_dir, release_dir, output_dir,
-                                      *, splits=("train", "validation", "test_id", "test_ood"), tier=None):
+                                      *, splits=("train", "validation", "test_id", "test_ood"),
+                                      tier=None, source_seed=None):
     """Materialize Stage-B legal model.npy files on public inputs only and return precomputed_manifest sha256."""
     from ldm_tts.engine.run_store import atomic_json_write
     from .selection import precomputed_manifest
@@ -240,9 +290,10 @@ def materialize_precomputed_reference(solver_name, stage_a_dir, release_dir, out
             # Strictly read ONLY public problem files; never access case["truth"].
             problem = read_problem(manifest_path.parent / case["public"])
             for seed in seeds:
+                lookup_seed = int(seed) if source_seed is None else int(source_seed)
                 diag = {}
                 field = solver(
-                    problem, {"wall_time_seconds": budget_s}, int(seed),
+                    problem, {"wall_time_seconds": budget_s}, lookup_seed,
                     fields_dir=stage_a_dir, split=use_split, diagnostics=diag,
                 )
                 dst = output_dir / target_split / case["case_id"] / str(seed)

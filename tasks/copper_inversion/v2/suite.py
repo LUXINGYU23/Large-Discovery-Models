@@ -337,13 +337,17 @@ class SuiteEvaluator:
 
     def __init__(self,root,execution,manifest_path,seconds=120,slots=None,objective="confirmation",purpose=None,
                  *,anonymize_cases=False,canonical_origin=False,randomize_orientation=False,
-                 resample=None,confirmation_packs=None,objective_version=None):
+                 resample=None,confirmation_packs=None,objective_version=None,seed_override=None):
         if any(type(v) is not bool for v in (anonymize_cases,canonical_origin,randomize_orientation)):
             raise ValueError("invalid case isolation flags")
+        if seed_override is not None and (type(seed_override) is not int or seed_override<0):
+            raise ValueError("invalid seed_override")
         self.root=Path(root);self.execution=execution
         self.slots=slots
         self.manifest_path=Path(manifest_path).resolve()
         self.manifest=load_manifest(self.manifest_path)
+        self.seed_override=seed_override
+        self.seeds=self.manifest["seeds"] if seed_override is None else [seed_override]
         if any('confirmation/problem.npz' not in case['sha256'] and 'confirmation/c0/problem.npz' not in case['sha256']
                for case in self.manifest['cases']):
             raise ValueError('independent confirmation measurements required for evaluation')
@@ -389,9 +393,15 @@ class SuiteEvaluator:
         if self.resample is not None:self.context["resample"]=dict(self.resample)
         if self.confirmation_packs is not None:
             self.context["confirmation_packs"]=list(self.confirmation_packs) if isinstance(self.confirmation_packs,list) else self.confirmation_packs
+        self._base_context=dict(self.context)
+        if self.seed_override is not None:
+            self.context["seed_override"]=self.seed_override
 
     def evaluation_attempt_usage_key(self,candidate):
         return digest(dict(context=self.context,source=candidate.canonical_key))
+
+    def _case_key(self,candidate):
+        return digest(dict(context=self._base_context,source=candidate.canonical_key))
 
     def _prepare_score_truth(self,key,case,case_root):
         raw_truth=self.manifest_path.parent/case["truth"]
@@ -518,6 +528,7 @@ class SuiteEvaluator:
         if file_hash(source)!=candidate.canonical_key:raise EvaluationPaused("source changed")
         if self.slots is not None:self.slots.reserve(candidate.canonical_key)
         key=self.evaluation_attempt_usage_key(candidate)
+        case_key=self._case_key(candidate)
         root=self.root/"evaluations"/key;root.mkdir(parents=True,exist_ok=True)
         result_path=root/"result.json"
         if result_path.exists():return EvaluationResult(**json.loads(result_path.read_text()))
@@ -533,9 +544,9 @@ class SuiteEvaluator:
             raw_problem=read_problem(self.manifest_path.parent/case["public"])
             scored_problem=(raw_problem if raw_problem["objective_version"]==self.objective_version
                             else {**raw_problem,"objective_version":self.objective_version})
-            orientation=case_orientation(key,case["case_id"]) if self.randomize_orientation else 0
+            orientation=case_orientation(case_key,case["case_id"]) if self.randomize_orientation else 0
             if self.anonymize_cases or self.canonical_origin or orientation:
-                cid=opaque_case_id(key,case["case_id"]) if self.anonymize_cases else None
+                cid=opaque_case_id(case_key,case["case_id"]) if self.anonymize_cases else None
                 problem=canonical_problem(scored_problem,case_id=cid,canonical_origin=self.canonical_origin,
                                           orientation=orientation)
                 save_problem(problem,inputs)
@@ -579,7 +590,7 @@ class SuiteEvaluator:
                 except ValueError as exc:
                     row.update(status="invalid",error=str(exc))
                 else:
-                    score_truth=self._prepare_score_truth(key,case,case_root)
+                    score_truth=self._prepare_score_truth(case_key,case,case_root)
                     scoring=dict(identity=identity,model=sha,inputs=score_inputs,model_dir=case_root/"model",
                         truth=score_truth,row_path=row_path)
                     if merged:return row,scoring
@@ -599,7 +610,7 @@ class SuiteEvaluator:
             # jobs counts solve + score per case, also when scoring is merged.
             row.update(outcome);row["jobs"]=2
             if row["status"]=="succeeded":row["error"]=""
-        plan=[(case,seed) for case in self.manifest["cases"] for seed in self.manifest["seeds"]]
+        plan=[(case,seed) for case in self.manifest["cases"] for seed in self.seeds]
         # Case concurrency is a scheduling parameter (case_workers), not part of the key.
         with ThreadPoolExecutor(max_workers=self.case_workers) as pool:
             rows=list(pool.map(solve_one,plan))

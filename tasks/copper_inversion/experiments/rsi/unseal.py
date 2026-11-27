@@ -26,7 +26,7 @@ from tasks.copper_inversion.experiments.rsi.q1 import references as load_referen
 
 
 REVIEW_FILE = "blind-review-required.json"
-REFERENCE_EXPERIMENTS = ("REF", "REF2")
+REFERENCE_EXPERIMENTS = ("REF", "REF2", "REF3")
 
 
 def check_reviews(root, protocol_id, experiment, run_ids, review=None):
@@ -177,7 +177,8 @@ def unseal(root, listing, *, expected_runs=None, operator=None, workers=8, revie
             "frozen_list_sha256": list_sha}
 
 
-def unseal_references(root, protocol_id, refs_path, selections_path, *, operator=None, experiment="REF"):
+def unseal_references(root, protocol_id, refs_path, selections_path, *,
+                      operator=None, experiment="REF", workers=1):
     """Unseal precommitted domain references once under the given reference experiment label."""
     if experiment not in REFERENCE_EXPERIMENTS:
         raise ValueError(f"unknown reference experiment: {experiment!r}")
@@ -211,7 +212,12 @@ def unseal_references(root, protocol_id, refs_path, selections_path, *, operator
                   "frozen_sha256": frozen_hashes, "selection_sha256": selection_hashes,
                   "operator": operator or pwd.getpwuid(os.geteuid()).pw_name, "uid": os.geteuid()}
         _append(paths["unseal_log"], {**common, "mode": "start", "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
-        results = {name: selection.run(target, "test") for name, target in targets.items()}
+        if workers <= 1:
+            results = {name: selection.run(target, "test") for name, target in targets.items()}
+        else:
+            with ThreadPoolExecutor(max_workers=min(int(workers), 8)) as pool:
+                futures = {name: pool.submit(selection.run, target, "test") for name, target in targets.items()}
+                results = {name: fut.result() for name, fut in futures.items()}
         entry = {**common, "mode": "completed", "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                  "results_sha256": {n: digest(result) for n, result in results.items()}}
         _append(paths["unseal_log"], entry)
@@ -226,6 +232,8 @@ def main(argv=None):
     parser.add_argument("--expected-runs", type=Path, help="JSON list of run ids the experiment must contain")
     parser.add_argument("--operator")
     parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--ref-workers", type=int, default=1,
+                        help="Parallel selection roots for reference unseal (default 1).")
     parser.add_argument("--blind-review", type=Path,
                         help='{"schema": "rsi-blind-review-v1", "experiment", "runs": {run_id: '
                              '{"review_sha256", "verdict": "explained", "reviewer", "note"}}}')
@@ -238,7 +246,8 @@ def main(argv=None):
         if not all((args.protocol_id, args.references, args.selections)) or args.list:
             parser.error(f"{args.experiment} requires --protocol-id, --references and --selections")
         print(json.dumps(unseal_references(args.root, args.protocol_id, args.references, args.selections,
-                                           operator=args.operator, experiment=args.experiment), sort_keys=True))
+                                           operator=args.operator, experiment=args.experiment,
+                                           workers=args.ref_workers), sort_keys=True))
         return 0
     if args.list is None:
         parser.error("--list is required for discovery experiments")

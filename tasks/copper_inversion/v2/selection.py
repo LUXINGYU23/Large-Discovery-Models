@@ -47,11 +47,13 @@ def selection_seconds(training_manifest,training,manifests,loaded):
 
 def freeze(root,sources,validation,tests,*,seconds,image,training_run,training_manifest,objective="confirmation",
            max_candidates=3,anonymize_cases=False,canonical_origin=False,randomize_orientation=False,
-           objective_version=None):
+           objective_version=None,seed_override=None):
     """objective is the run judge's validation scoring; sealed outcomes stay IoU."""
     root=Path(root)
     if any(type(v) is not bool for v in (anonymize_cases,canonical_origin,randomize_orientation)):
         raise ValueError("invalid case isolation flags")
+    if seed_override is not None and (type(seed_override) is not int or seed_override<0):
+        raise ValueError("invalid seed_override")
     if objective not in OBJECTIVES:raise ValueError("unknown selection objective")
     if objective_version is not None and objective_version not in OBJECTIVE_VERSIONS:
         raise ValueError("unknown selection objective version")
@@ -96,6 +98,7 @@ def freeze(root,sources,validation,tests,*,seconds,image,training_run,training_m
     if canonical_origin:frozen["canonical_origin"]=True
     if randomize_orientation:frozen["randomize_orientation"]=True
     if objective_version is not None:frozen["objective_version"]=objective_version
+    if seed_override is not None:frozen["seed_override"]=seed_override
     atomic_json_write(root/"frozen.json",frozen)
     atomic_json_write(root/"state.json",dict(phase="frozen",frozen_sha256=digest(frozen)))
     return frozen
@@ -337,6 +340,7 @@ def run(root,phase):
                 if frozen.get("canonical_origin"):options["canonical_origin"]=True
                 if frozen.get("randomize_orientation"):options["randomize_orientation"]=True
                 if frozen.get("objective_version"):options["objective_version"]=frozen["objective_version"]
+                if frozen.get("seed_override") is not None:options["seed_override"]=frozen["seed_override"]
                 evaluator=SuiteEvaluator(work,execution,frozen["manifests"][index]["path"],frozen["seconds"],**options)
                 result=evaluator.evaluate(candidate)
                 rows.append(dict(source_sha256=payload["sha256"],split=split,metrics=dict(result.metrics)))

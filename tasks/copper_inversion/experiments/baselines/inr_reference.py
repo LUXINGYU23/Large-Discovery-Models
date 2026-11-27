@@ -228,9 +228,15 @@ def _limit_folds(folds, max_folds):
     return [folds[i] for i in seen]
 
 
+DEFAULT_INR_CONFIG = INR_CONFIGS[0]
+
+
 def run_case(public_dir, out_dir, *, seed=0, cv_epochs=400, full_epochs=800,
-             domain_samples=1000, max_cv_folds=3, lr=1e-3, wall_budget_seconds=600.0, device="cpu"):
+             domain_samples=1000, max_cv_folds=3, lr=1e-3, wall_budget_seconds=600.0,
+             device="cpu", mode="cv"):
     """Run M7 Stage-A on one (public_dir, seed) and write field.npy + choice.json."""
+    if mode not in ("cv", "default"):
+        raise ValueError(f"unknown GeoINR Stage-A mode: {mode!r}")
     dev_str = _validate_device(device)
     t0 = time.monotonic()
     out_dir = Path(out_dir)
@@ -248,10 +254,64 @@ def run_case(public_dir, out_dir, *, seed=0, cv_epochs=400, full_epochs=800,
     if not (data["y_b"] > 0.5).any():
         choice = {
             "method": "inr_mlp",
+            "mode": mode,
             "case_id": problem["case_id"],
             "seed": int(seed),
             "no_ore": True,
             "fallback": False,
+            "wall_seconds": round(float(time.monotonic() - t0), 4),
+        }
+        (out_dir / "choice.json").write_text(json.dumps(choice, indent=2, sort_keys=True))
+        return choice
+
+    if mode == "default":
+        cfg = DEFAULT_INR_CONFIG
+        try:
+            pred_fn = train_geoinr(
+                data["X_b"], data["y_b"], data["w_b"], data["X_c"],
+                data["center"], data["E"], s_z=cfg["s_z"], lam=cfg["lam"],
+                seed=int(seed), epochs=full_epochs, domain_samples=domain_samples, lr=lr,
+                device=dev_str,
+            )
+            field_def = harness.predict_chunked(pred_fn, data["G"]).astype(np.float32)
+        except Exception:
+            choice = {
+                "method": "inr_mlp",
+                "mode": "default",
+                "case_id": problem["case_id"],
+                "seed": int(seed),
+                "no_ore": False,
+                "fallback": True,
+                "cv_evaluated": 0,
+                "deadline_stopped": False,
+                "wall_seconds": round(float(time.monotonic() - t0), 4),
+            }
+            (out_dir / "choice.json").write_text(json.dumps(choice, indent=2, sort_keys=True))
+            return choice
+        np.save(out_dir / "field.npy", field_def, allow_pickle=False)
+        block = {
+            "selected_rule": "native",
+            "selected_config": cfg,
+            "cv_score": None,
+            "cv_evaluated": 0,
+            "same_as_cv": True,
+        }
+        choice = {
+            "method": "inr_mlp",
+            "mode": "default",
+            "case_id": problem["case_id"],
+            "seed": int(seed),
+            "no_ore": False,
+            "fallback": False,
+            "cv_evaluated": 0,
+            "cv_folds_used": 0,
+            "cv_epochs": 0,
+            "full_epochs": int(full_epochs),
+            "lr": float(lr),
+            "deadline_stopped": False,
+            "default": block,
+            "native": block,
+            "cv": block,
             "wall_seconds": round(float(time.monotonic() - t0), 4),
         }
         (out_dir / "choice.json").write_text(json.dumps(choice, indent=2, sort_keys=True))
@@ -402,7 +462,7 @@ def run_case(public_dir, out_dir, *, seed=0, cv_epochs=400, full_epochs=800,
 
 
 def _worker(task):
-    pub_dir, out_dir, seed, cv_ep, full_ep, dom_s, max_f, lr, budget_s, dev_str = task
+    pub_dir, out_dir, seed, cv_ep, full_ep, dom_s, max_f, lr, budget_s, dev_str, mode = task
     _validate_device(dev_str)
     if dev_str == "cpu":
         os.environ["CUDA_VISIBLE_DEVICES"] = ""
@@ -414,13 +474,13 @@ def _worker(task):
     return run_case(
         pub_dir, out_dir, seed=seed, cv_epochs=cv_ep, full_epochs=full_ep,
         domain_samples=dom_s, max_cv_folds=max_f, lr=lr, wall_budget_seconds=budget_s,
-        device=dev_str,
+        device=dev_str, mode=mode,
     )
 
 
 def run_split(release_dir, split, output_root, *, seeds=(0,), workers=8,
               cv_epochs=400, full_epochs=800, domain_samples=1000, max_cv_folds=3,
-              lr=1e-3, wall_budget_seconds=900.0, device="cpu"):
+              lr=1e-3, wall_budget_seconds=900.0, device="cpu", mode="cv"):
     dev_str = _validate_device(device)
     release_dir = Path(release_dir).resolve()
     manifest_path = release_dir / split / "manifest.json"
@@ -430,7 +490,7 @@ def run_split(release_dir, split, output_root, *, seeds=(0,), workers=8,
             str(manifest_path.parent / c["public"]),
             str(Path(output_root) / split / c["case_id"] / str(int(s))),
             int(s), int(cv_epochs), int(full_epochs), int(domain_samples), int(max_cv_folds),
-            float(lr), float(wall_budget_seconds), dev_str,
+            float(lr), float(wall_budget_seconds), dev_str, mode,
         )
         for s in seeds
         for c in manifest["cases"]
@@ -443,6 +503,7 @@ def run_split(release_dir, split, output_root, *, seeds=(0,), workers=8,
     return {
         "release": str(release_dir),
         "split": split,
+        "mode": mode,
         "seeds": [int(s) for s in seeds],
         "runs": len(results),
         "fallbacks": sum(1 for r in results if r.get("fallback")),
@@ -467,6 +528,7 @@ def main(argv=None):
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--wall-budget-seconds", type=float, default=900.0)
     parser.add_argument("--device", default="cpu", help="Torch device (cpu or free cuda:<id>, never GPU 7).")
+    parser.add_argument("--mode", default="cv", choices=("cv", "default"))
     args = parser.parse_args(argv)
     seeds = [int(x.strip()) for x in args.seeds.split(",") if x.strip()]
     summary = run_split(
@@ -474,6 +536,7 @@ def main(argv=None):
         cv_epochs=args.cv_epochs, full_epochs=args.full_epochs,
         domain_samples=args.domain_samples, max_cv_folds=args.max_cv_folds,
         lr=args.lr, wall_budget_seconds=args.wall_budget_seconds, device=args.device,
+        mode=args.mode,
     )
     print(json.dumps(summary, sort_keys=True))
     return 0

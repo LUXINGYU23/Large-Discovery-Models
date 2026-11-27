@@ -32,6 +32,12 @@ def _build_rf_configs():
 
 
 RF_CONFIGS = _build_rf_configs()
+DEFAULT_RF_CONFIG = {
+    "s_z": 4,
+    "n_estimators": 100,
+    "min_samples_leaf": 1,
+    "max_features": "sqrt",
+}
 
 
 def rf_features(points, center, s_z):
@@ -55,10 +61,11 @@ def fit_rf_predictor(cfg, X_b, y_b, w_b, center, *, seed):
         return lambda pts: np.ones(len(pts), dtype=float)
     if not y_int.any():
         return lambda pts: np.zeros(len(pts), dtype=float)
+    max_feat = cfg["max_features"] if isinstance(cfg["max_features"], str) else int(cfg["max_features"])
     clf = RandomForestClassifier(
-        n_estimators=300,
+        n_estimators=int(cfg.get("n_estimators", 300)),
         min_samples_leaf=int(cfg["min_samples_leaf"]),
-        max_features=int(cfg["max_features"]),
+        max_features=max_feat,
         n_jobs=1,
         random_state=rf_seed,
     )
@@ -73,8 +80,10 @@ def fit_rf_predictor(cfg, X_b, y_b, w_b, center, *, seed):
     return predict
 
 
-def run_case(public_dir, out_dir, *, seed=0, wall_budget_seconds=120.0):
+def run_case(public_dir, out_dir, *, seed=0, wall_budget_seconds=120.0, mode="cv"):
     """Run M8 rf_xyz Stage-A on one (public_dir, seed) and write field.npy + choice.json."""
+    if mode not in ("cv", "default"):
+        raise ValueError(f"unknown RF Stage-A mode: {mode!r}")
     t0 = time.monotonic()
     out_dir = Path(out_dir)
     if (out_dir / "choice.json").is_file() and (
@@ -91,10 +100,57 @@ def run_case(public_dir, out_dir, *, seed=0, wall_budget_seconds=120.0):
     if not (data["y_b"] > 0.5).any():
         choice = {
             "method": "rf_xyz",
+            "mode": mode,
             "case_id": problem["case_id"],
             "seed": int(seed),
             "no_ore": True,
             "fallback": False,
+            "wall_seconds": round(float(time.monotonic() - t0), 4),
+        }
+        (out_dir / "choice.json").write_text(json.dumps(choice, indent=2, sort_keys=True))
+        return choice
+
+    if mode == "default":
+        try:
+            pred_fn = fit_rf_predictor(
+                DEFAULT_RF_CONFIG, data["X_b"], data["y_b"], data["w_b"],
+                data["center"], seed=int(seed),
+            )
+            field_def = harness.predict_chunked(pred_fn, data["G"]).astype(np.float32)
+        except Exception:
+            choice = {
+                "method": "rf_xyz",
+                "mode": "default",
+                "case_id": problem["case_id"],
+                "seed": int(seed),
+                "no_ore": False,
+                "fallback": True,
+                "cv_evaluated": 0,
+                "deadline_stopped": False,
+                "wall_seconds": round(float(time.monotonic() - t0), 4),
+            }
+            (out_dir / "choice.json").write_text(json.dumps(choice, indent=2, sort_keys=True))
+            return choice
+        np.save(out_dir / "field.npy", field_def, allow_pickle=False)
+        block = {
+            "selected_rule": "native",
+            "selected_config": DEFAULT_RF_CONFIG,
+            "cv_score": None,
+            "cv_evaluated": 0,
+            "same_as_cv": True,
+        }
+        choice = {
+            "method": "rf_xyz",
+            "mode": "default",
+            "case_id": problem["case_id"],
+            "seed": int(seed),
+            "no_ore": False,
+            "fallback": False,
+            "cv_evaluated": 0,
+            "deadline_stopped": False,
+            "default": block,
+            "native": block,
+            "cv": block,
             "wall_seconds": round(float(time.monotonic() - t0), 4),
         }
         (out_dir / "choice.json").write_text(json.dumps(choice, indent=2, sort_keys=True))
@@ -236,15 +292,16 @@ def run_case(public_dir, out_dir, *, seed=0, wall_budget_seconds=120.0):
 
 
 def _worker(task):
-    pub_dir, out_dir, seed, budget_s = task
+    pub_dir, out_dir, seed, budget_s, mode = task
     os.environ.setdefault("OMP_NUM_THREADS", "1")
     os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
     os.environ.setdefault("MKL_NUM_THREADS", "1")
     os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
-    return run_case(pub_dir, out_dir, seed=seed, wall_budget_seconds=budget_s)
+    return run_case(pub_dir, out_dir, seed=seed, wall_budget_seconds=budget_s, mode=mode)
 
 
-def run_split(release_dir, split, output_root, *, seeds=(0, 1, 2, 3, 4), workers=8, wall_budget_seconds=120.0):
+def run_split(release_dir, split, output_root, *, seeds=(0, 1, 2, 3, 4), workers=8,
+              wall_budget_seconds=120.0, mode="cv"):
     release_dir = Path(release_dir).resolve()
     manifest_path = release_dir / split / "manifest.json"
     manifest = json.loads(manifest_path.read_text())
@@ -252,7 +309,7 @@ def run_split(release_dir, split, output_root, *, seeds=(0, 1, 2, 3, 4), workers
         (
             str(manifest_path.parent / c["public"]),
             str(Path(output_root) / split / c["case_id"] / str(int(s))),
-            int(s), float(wall_budget_seconds),
+            int(s), float(wall_budget_seconds), mode,
         )
         for s in seeds
         for c in manifest["cases"]
@@ -265,6 +322,7 @@ def run_split(release_dir, split, output_root, *, seeds=(0, 1, 2, 3, 4), workers
     return {
         "release": str(release_dir),
         "split": split,
+        "mode": mode,
         "seeds": [int(s) for s in seeds],
         "runs": len(results),
         "fallbacks": sum(1 for r in results if r.get("fallback")),
@@ -283,11 +341,12 @@ def main(argv=None):
     parser.add_argument("--seeds", default="0,1,2,3,4", help="Comma-separated integer seeds.")
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--wall-budget-seconds", type=float, default=120.0)
+    parser.add_argument("--mode", default="cv", choices=("cv", "default"))
     args = parser.parse_args(argv)
     seeds = [int(x.strip()) for x in args.seeds.split(",") if x.strip()]
     summary = run_split(
         args.release, args.split, args.output, seeds=seeds,
-        workers=args.workers, wall_budget_seconds=args.wall_budget_seconds,
+        workers=args.workers, wall_budget_seconds=args.wall_budget_seconds, mode=args.mode,
     )
     print(json.dumps(summary, sort_keys=True))
     return 0

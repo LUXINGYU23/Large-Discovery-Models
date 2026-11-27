@@ -612,3 +612,204 @@ def test_ref_and_ref2_independent_one_shot_unseal_and_merged_outcomes(tmp_path, 
     assert isinstance(loaded.sealed("REF", "initial", "full", "test_id"), float)
     assert isinstance(loaded.sealed("REF2", "wei2024", "full", "test_id"), float)
     assert isinstance(loaded.sealed("M1", "ldm4geo-s101", "full", "test_id"), float)
+
+
+def test_default_in_container_solvers_zero_cv_native_rule_and_seed_determinism(monkeypatch):
+    from tasks.copper_inversion.v2 import baseline_harness as harness
+    from tasks.copper_inversion.v2 import baselines, fdi_baseline, lit_baselines
+    from tasks.copper_inversion.v2.fixtures import fixtures
+    from tasks.copper_inversion.v2.geometry import canonicalize
+    from tasks.copper_inversion.tests.test_v2_baselines import _make_ellipsoid_lens, _synthetic_problem
+
+    def _forbid_cv(*args, **kwargs):
+        raise AssertionError("default baseline must never invoke CV")
+
+    monkeypatch.setattr(harness, "make_hole_folds", _forbid_cv)
+    monkeypatch.setattr(harness, "evaluate_config_cv", _forbid_cv)
+    monkeypatch.setattr(baselines, "_select_z_stretch_cv", _forbid_cv)
+
+    in_container_defaults = (
+        baselines.initial_default,
+        baselines.stretched_nearest_class_default,
+        baselines.layered_horizon_default,
+        baselines.ellipsoid_fit_default,
+        lit_baselines.rbf_sdf_default,
+        lit_baselines.indicator_kriging_default,
+        lit_baselines.svm_rbf_default,
+        lit_baselines.gp_classifier_default,
+        lit_baselines.knn_idw_default,
+        fdi_baseline.fdi_smooth_default,
+    )
+    probs = list(fixtures()) + [_make_ellipsoid_lens()[0]]
+    shape = (10, 10, 8)
+    holes = [(2, 2), (5, 5), (8, 8)]
+    p_empty, _ = _synthetic_problem(np.zeros(shape, dtype=bool), holes, shape=shape, case_id="def-empty")
+    p_full, _ = _synthetic_problem(np.ones(shape, dtype=bool), holes, shape=shape, case_id="def-full")
+
+    budget = {"wall_time_seconds": 10.0}
+    for solver in in_container_defaults:
+        for p in (*probs, p_empty, p_full):
+            outputs = [solver(p, budget, s) for s in (47, 48, 49, 50)]
+            canonicalize(p, outputs[0])
+            for arr in outputs[1:]:
+                assert np.array_equal(outputs[0], arr)
+
+    p_lens, _ = _make_ellipsoid_lens()
+    for solver in (
+        lit_baselines.rbf_sdf_default,
+        lit_baselines.indicator_kriging_default,
+        lit_baselines.svm_rbf_default,
+        lit_baselines.gp_classifier_default,
+        lit_baselines.knn_idw_default,
+        fdi_baseline.fdi_smooth_default,
+    ):
+        diag = {}
+        out = solver(p_lens, budget, 47, diagnostics=diag)
+        canonicalize(p_lens, out)
+        assert diag["cv_evaluated"] == 0
+        assert diag["selected_rule"] == "native"
+        assert diag["fallback"] is False
+
+
+def test_ref3_preset_four_seeds_unseal_and_per_seed_export(tmp_path, monkeypatch):
+    from tasks.copper_inversion.experiments.baselines import prepare_ref
+    from tasks.copper_inversion.experiments.rsi.analysis.outcomes import Outcomes
+    from tasks.copper_inversion.tests.test_rsi_unseal import FakeSuite, fake_evaluator
+
+    root, manifests, _ = setup(tmp_path, ["ldm4geo-s101"], prefixes=(None,))
+    release = manifests["train"].parent.parent
+    import shutil
+    shutil.copytree(release / "train", release / "train_s")
+    tier = {
+        "train_manifest": "train_s/manifest.json",
+        "solver_seconds": 10,
+        "slots": 321,
+        "train_bodies": 4,
+        "validation_manifest": "validation/manifest.json",
+        "sealed_manifests": ["test_id/manifest.json", "test_ood/manifest.json"],
+    }
+    (release / "development-receipt.json").write_text(json.dumps({"tiers": {"S": tier}}))
+
+    stage_a_root = tmp_path / "stage_a"
+    prob = fixture()
+    feasible = prob["domain_mask"] & ~prob["forbidden_mask"]
+    base_mask = (model(prob) > 0)[feasible]
+    for split_sub in ("train_s", "validation", "test_id", "test_ood"):
+        m = json.loads((release / split_sub / "manifest.json").read_text())
+        for c in m["cases"]:
+            gdir = stage_a_root / "gempy" / split_sub / c["case_id"]
+            gdir.mkdir(parents=True)
+            np.save(gdir / "ore.npy", model(prob) > 0, allow_pickle=False)
+            gblock = {"selected_rule": "native", "selected_config": {"form": "L", "orient": "plane", "range": 1.7},
+                      "cv_score": None, "cv_evaluated": 0, "same_as_cv": True}
+            (gdir / "choice.json").write_text(json.dumps({
+                "method": "potential_field", "mode": "default", "generator_matched": True,
+                "case_id": c["case_id"], "no_ore": False, "fallback": False,
+                "default": gblock, "native": gblock, "cv": gblock, "wall_seconds": 1.25,
+            }))
+            for seed in (47, 48, 49, 50):
+                wdir = stage_a_root / "wei2024" / split_sub / c["case_id"] / str(seed)
+                wdir.mkdir(parents=True)
+                f_prob = np.where(base_mask, 0.80 + 0.01 * (seed - 47), 0.15).astype(np.float32)
+                np.save(wdir / "field.npy", f_prob, allow_pickle=False)
+                (wdir / "choice.json").write_text(json.dumps({
+                    "method": "wei2024", "case_id": c["case_id"], "seed": seed,
+                    "no_ore": False, "fallback": False,
+                    "cv": {"selected_rule": "native", "selected_config": {"iter_num": 1000},
+                           "cv_score": None, "cv_evaluated": 0},
+                    "wall_seconds": 500.0 + seed,
+                }))
+
+    ref3_path = prepare_ref.prepare_ref_inputs(
+        release, stage_a_root, tmp_path / "ref3_in", tier="S",
+        in_container_names=("initial", "rbf_sdf"),
+        offline_names=("potential_field", "wei2024"),
+        preset="ref3", seeds=(47, 48, 49, 50),
+    )
+    refs_data = json.loads(ref3_path.read_text())
+    assert len(refs_data) == 16
+    assert refs_data["rbf_sdf-s47"]["sha256"] == refs_data["rbf_sdf-s50"]["sha256"]
+    assert refs_data["rbf_sdf-s48"]["seed"] == 48
+    pf47_models = sorted(Path(refs_data["potential_field-s47"]["fields"]).rglob("model.npy"))
+    pf50_models = sorted(Path(refs_data["potential_field-s50"]["fields"]).rglob("model.npy"))
+    assert len(pf47_models) == len(pf50_models) > 0
+    for m47, m50 in zip(pf47_models, pf50_models):
+        assert m47.read_bytes() == m50.read_bytes()
+
+    eval_calls = []
+
+    def fake_eval_sources(svc_root, manifest, seconds, slots, image, sources, **kwargs):
+        from tasks.copper_inversion.core.candidate import seal
+        from tasks.copper_inversion.v2.suite import aggregate
+        eval_calls.extend(sources)
+        svc_root = Path(svc_root)
+        svc_root.mkdir(parents=True, exist_ok=True)
+        train_m = json.loads(Path(manifest).read_text())
+        (svc_root / "identity.json").write_text(json.dumps({
+            "configuration": {"manifest": str(manifest), "seconds": seconds, "image": image},
+            "suite_digest": digest(train_m),
+        }))
+        for src_p, sha in sources:
+            seal(svc_root, Path(src_p).read_bytes())
+            ev = svc_root / "evaluations" / sha
+            rows = [
+                {"case_id": c["case_id"], "seed": 47, "parent_id": c["parent_id"], "solver_wall_seconds": 0.5,
+                 "status": "succeeded", "metrics": {"iou": 0.42, "confirmation_loss_total": 0.24}}
+                for c in train_m["cases"]
+            ]
+            for r in rows:
+                rp = ev / r["case_id"] / "47/receipt.json"
+                rp.parent.mkdir(parents=True, exist_ok=True)
+                rp.write_text(json.dumps(r))
+            (ev / "private-case-results.json").write_text(json.dumps(rows))
+            (ev / "result.json").write_text(json.dumps({
+                "candidate_id": sha, "status": "succeeded", "metrics": aggregate(rows),
+                "metadata": {"suite_digest": digest(train_m)},
+            }))
+        return svc_root
+
+    seen_seed_overrides = []
+
+    class _FakeSuiteRef3(FakeSuite):
+        def __init__(self, root, execution, manifest, seconds, **kwargs):
+            seen_seed_overrides.append(kwargs.get("seed_override"))
+            super().__init__(root, execution, manifest, seconds)
+
+    monkeypatch.setattr(q1, "evaluate_sources", fake_eval_sources)
+    sel_ref3 = tmp_path / "sel_ref3"
+    with fake_evaluator(), patch("tasks.copper_inversion.v2.selection.SuiteEvaluator", _FakeSuiteRef3):
+        q1.build_references(ref3_path, release, sel_ref3, IMAGE,
+                            anonymize_cases=True, canonical_origin=True, randomize_orientation=True,
+                            objective_version="objective_v3")
+        # Unique source files are evaluated once on train_s despite 4 seeds each.
+        assert len(eval_calls) == 2
+        res3 = unseal_references(root, PID, ref3_path, sel_ref3 / "references.json",
+                                 operator="eval", experiment="REF3", workers=2)
+        assert res3 == {"status": "unsealed", "experiment": "REF3", "references": 16}
+        with pytest.raises(ValueError, match="untested|already been unsealed"):
+            unseal_references(root, PID, ref3_path, sel_ref3 / "references.json", experiment="REF3")
+
+    assert {47, 48, 49, 50} <= set(seen_seed_overrides)
+
+    out_json = tmp_path / "outcomes-REF3.json"
+    assert export_outcomes.main([
+        "--root", str(root), "--protocol-id", PID, "--experiment", "REF3",
+        "--references", str(sel_ref3 / "references.json"),
+        "--output", str(out_json),
+    ]) == 0
+    table = json.loads(out_json.read_text())
+    assert len(table["rows"]) == 16
+    by_arm = {}
+    for row in table["rows"]:
+        by_arm.setdefault(row["arm"], []).append((row["seed"], row["test_id_iou"]))
+    assert set(by_arm) == {"initial", "rbf_sdf", "potential_field", "wei2024"}
+    for arm, items in by_arm.items():
+        assert sorted(s for s, _ in items) == [47, 48, 49, 50]
+    # Deterministic methods have exact SD == 0 across the 4 seeds.
+    for det_arm in ("initial", "rbf_sdf", "potential_field"):
+        vals = [v for _, v in by_arm[det_arm]]
+        assert float(np.std(vals, ddof=1)) == 0.0
+
+    loaded = Outcomes.load(out_json)
+    assert len(loaded.references) == 16
+    assert isinstance(loaded.sealed("REF3", "wei2024-s48", "full", "test_id"), float)

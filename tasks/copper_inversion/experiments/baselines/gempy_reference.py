@@ -400,8 +400,14 @@ def _pooled_jaccard(tp, fp, fn):
     return float(tp) / float(tp + fp + fn) if tp > 0 else 0.0
 
 
-def run_case(public_dir, out_dir, *, wall_budget_seconds=120.0):
+DEFAULT_GEMPY_CONFIG = GEMPY_CONFIGS[0]
+DEFAULT_GEMPY_FALLBACK_CONFIG = {"form": "C", "orient": "plane", "range": 1.7}
+
+
+def run_case(public_dir, out_dir, *, wall_budget_seconds=120.0, mode="cv"):
     """Run M4 Stage-A on one public problem directory and save ore.npy + choice.json."""
+    if mode not in ("cv", "default"):
+        raise ValueError(f"unknown GemPy Stage-A mode: {mode!r}")
     t0 = time.monotonic()
     out_dir = Path(out_dir)
     if (out_dir / "choice.json").is_file() and (
@@ -417,10 +423,62 @@ def run_case(public_dir, out_dir, *, wall_budget_seconds=120.0):
     if not info["any_ore"]:
         choice = {
             "method": "potential_field",
+            "mode": mode,
             "generator_matched": True,
             "case_id": problem["case_id"],
             "no_ore": True,
             "fallback": False,
+            "wall_seconds": round(float(time.monotonic() - t0), 4),
+        }
+        (out_dir / "choice.json").write_text(json.dumps(choice, indent=2, sort_keys=True))
+        return choice
+
+    if mode == "default":
+        full_pts = info["xyz"].reshape(-1, 3)
+        used_cfg = None
+        ore_default = None
+        for cfg in (DEFAULT_GEMPY_CONFIG, DEFAULT_GEMPY_FALLBACK_CONFIG):
+            try:
+                ore_flat, _ = evaluate_gempy(problem, cfg, full_pts)
+                ore_default = ore_flat.reshape(info["shape"])
+                used_cfg = cfg
+                break
+            except Exception:
+                continue
+        if ore_default is None:
+            choice = {
+                "method": "potential_field",
+                "mode": "default",
+                "generator_matched": True,
+                "case_id": problem["case_id"],
+                "no_ore": False,
+                "fallback": True,
+                "cv_evaluated": 0,
+                "deadline_stopped": False,
+                "wall_seconds": round(float(time.monotonic() - t0), 4),
+            }
+            (out_dir / "choice.json").write_text(json.dumps(choice, indent=2, sort_keys=True))
+            return choice
+        np.save(out_dir / "ore.npy", ore_default, allow_pickle=False)
+        block = {
+            "selected_rule": "native",
+            "selected_config": used_cfg,
+            "cv_score": None,
+            "cv_evaluated": 0,
+            "same_as_cv": True,
+        }
+        choice = {
+            "method": "potential_field",
+            "mode": "default",
+            "generator_matched": True,
+            "case_id": problem["case_id"],
+            "no_ore": False,
+            "fallback": False,
+            "cv_evaluated": 0,
+            "deadline_stopped": False,
+            "default": block,
+            "native": block,
+            "cv": block,
             "wall_seconds": round(float(time.monotonic() - t0), 4),
         }
         (out_dir / "choice.json").write_text(json.dumps(choice, indent=2, sort_keys=True))
@@ -560,23 +618,24 @@ def run_case(public_dir, out_dir, *, wall_budget_seconds=120.0):
 
 
 def _worker(task):
-    pub_dir, out_dir, budget_s = task
+    pub_dir, out_dir, budget_s, mode = task
     os.environ.setdefault("OMP_NUM_THREADS", "1")
     os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
     os.environ.setdefault("MKL_NUM_THREADS", "1")
     os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
     try:
-        return run_case(pub_dir, out_dir, wall_budget_seconds=budget_s)
+        return run_case(pub_dir, out_dir, wall_budget_seconds=budget_s, mode=mode)
     finally:
         shutil.rmtree(f"/tmp/gempy_tmp_{os.geteuid()}_{os.getpid()}", ignore_errors=True)
 
 
-def run_split(release_dir, split, output_root, *, workers=4, wall_budget_seconds=240.0):
+def run_split(release_dir, split, output_root, *, workers=4, wall_budget_seconds=240.0, mode="cv"):
     release_dir = Path(release_dir).resolve()
     manifest_path = release_dir / split / "manifest.json"
     manifest = json.loads(manifest_path.read_text())
     tasks = [
-        (str(manifest_path.parent / c["public"]), str(Path(output_root) / split / c["case_id"]), wall_budget_seconds)
+        (str(manifest_path.parent / c["public"]), str(Path(output_root) / split / c["case_id"]),
+         wall_budget_seconds, mode)
         for c in manifest["cases"]
     ]
     if workers <= 1:
@@ -587,6 +646,7 @@ def run_split(release_dir, split, output_root, *, workers=4, wall_budget_seconds
     return {
         "release": str(release_dir),
         "split": split,
+        "mode": mode,
         "cases": len(results),
         "fallbacks": sum(1 for r in results if r.get("fallback")),
         "median_seconds": float(np.median([r["wall_seconds"] for r in results])) if results else 0.0,
@@ -603,10 +663,11 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--wall-budget-seconds", type=float, default=240.0)
+    parser.add_argument("--mode", default="cv", choices=("cv", "default"))
     args = parser.parse_args(argv)
     summary = run_split(
         args.release, args.split, args.output,
-        workers=args.workers, wall_budget_seconds=args.wall_budget_seconds,
+        workers=args.workers, wall_budget_seconds=args.wall_budget_seconds, mode=args.mode,
     )
     print(json.dumps(summary, sort_keys=True))
     return 0

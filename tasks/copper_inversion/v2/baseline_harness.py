@@ -371,9 +371,11 @@ def finalize_field(problem, data, f, tau0, rule, *, selected_config=None, cv_sco
     return field
 
 
-def stretched_fallback(problem, data, diagnostics=None, started=None, *, cv_evaluated=0, deadline_stopped=False):
+def stretched_fallback(problem, data, diagnostics=None, started=None, *, cv_evaluated=0,
+                       deadline_stopped=False, default_mode=False):
     """Numerical-failure fallback to stretched_nearest_class (§2.5)."""
-    field = _base().stretched_nearest_class(problem)
+    b = _base()
+    field = b.stretched_nearest_class_default(problem) if default_mode else b.stretched_nearest_class(problem)
     if diagnostics is not None:
         diagnostics.update({
             "selected_rule": "fallback",
@@ -390,6 +392,41 @@ def stretched_fallback(problem, data, diagnostics=None, started=None, *, cv_eval
             "wall_seconds": float(time.monotonic() - started) if started is not None else 0.0,
         })
     return field
+
+
+def solve_default(problem, budget, default_config, fit, tau0=0.0, *,
+                  diagnostics=None, eval_chunk_size=EVAL_CHUNK_SIZE, fallback_configs=()):
+    """Zero-CV, zero-grid-search solver: fixed default config + native threshold + _enforce_legal."""
+    del budget
+    started = time.monotonic()
+    data = extract_public_data(problem)
+    if not (data["y_b"] > 0.5).any():
+        return no_ore_fallback(problem, data, diagnostics=diagnostics, started=started)
+
+    for cfg in (default_config, *fallback_configs):
+        try:
+            pred_fn = fit(cfg, data["X_b"], data["y_b"], data["w_b"], data["X_c"], problem)
+            f = predict_chunked(pred_fn, data["G"], chunk_size=eval_chunk_size)
+            return finalize_field(
+                problem,
+                data,
+                f,
+                tau0,
+                "native",
+                selected_config=cfg,
+                cv_score=None,
+                cv_evaluated=0,
+                deadline_stopped=False,
+                diagnostics=diagnostics,
+                started=started,
+            )
+        except Exception:
+            continue
+
+    return stretched_fallback(
+        problem, data, diagnostics=diagnostics, started=started,
+        cv_evaluated=0, deadline_stopped=False, default_mode=True,
+    )
 
 
 def _wall_deadline(budget, started):

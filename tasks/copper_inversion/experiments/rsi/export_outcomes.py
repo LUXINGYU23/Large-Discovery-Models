@@ -617,9 +617,16 @@ def export_references(root, protocol_id, *, q1=None, references=None, experiment
                                          if r["split"] in SPLITS}
             if experiment in REFERENCE_EXPERIMENTS:
                 val_seeds = load_manifest(frozen["manifests"][0]["path"])["seeds"]
-                seed_val = val_seeds[0] if len(val_seeds) == 1 else None
-                arm_name = ("offline_reference" if frozen["candidates"][0].get("kind") == "precomputed"
-                            else "in_container_reference")
+                seed_val = frozen.get("seed_override")
+                if seed_val is None:
+                    seed_val = val_seeds[0] if len(val_seeds) == 1 else None
+                seed_match = re.fullmatch(r"(.+)-s(\d+)", name)
+                if seed_match is not None:
+                    arm_name = seed_match.group(1)
+                    seed_val = int(seed_match.group(2))
+                else:
+                    arm_name = ("offline_reference" if frozen["candidates"][0].get("kind") == "precomputed"
+                                else "in_container_reference")
                 run_info = {
                     "experiment": experiment,
                     "protocol_id": protocol_id,
