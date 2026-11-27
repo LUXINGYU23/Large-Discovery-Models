@@ -1,0 +1,37 @@
+diff --git a/shinka/llm/kwargs.py b/shinka/llm/kwargs.py
+index 8b051d8..b4d651a 100644
+--- a/shinka/llm/kwargs.py
++++ b/shinka/llm/kwargs.py
+@@ -50,6 +50,7 @@ THINKING_TOKENS = {
+ }
+ 
+ NO_TEMPERATURE_MODELS = {
++    "deepseek-flash",
+     "deepseek-v4-flash",
+     "deepseek-v4-pro",
+     *GEMINI_THINKING_LEVEL_MODELS,
+@@ -320,7 +321,11 @@ def sample_model_kwargs(
+         if r_effort == "disabled":
+             kwargs_dict["extra_body"] = {"thinking": {"type": "disabled"}}
+         else:
+-            kwargs_dict["reasoning_effort"] = "max" if r_effort == "max" else "high"
++            kwargs_dict["reasoning_effort"] = (
++                "low"
++                if r_effort in ("min", "minimal", "low")
++                else ("max" if r_effort == "max" else "high")
++            )
+             kwargs_dict["extra_body"] = {"thinking": {"type": "enabled"}}
+ 
+     # 4.e) SET: max_tokens for all other models
+diff --git a/shinka/llm/providers/pricing.csv b/shinka/llm/providers/pricing.csv
+index ed24914..dac9728 100644
+--- a/shinka/llm/providers/pricing.csv
++++ b/shinka/llm/providers/pricing.csv
+@@ -62,6 +62,7 @@ gpt-5.2-pro,openai,21.0,168.0,,,,True,1,1
+ deepseek-chat,deepseek,0.14,0.28,,,,False,0,0
+ deepseek-reasoner,deepseek,0.14,0.28,,,,True,0,0
+ deepseek-v4-flash,deepseek,0.15,0.6,,,,True,0,0
++deepseek-flash,deepseek,0.15,0.6,,,,True,0,0
+ deepseek-v4-pro,deepseek,0.66,1.9800000000000002,,,,True,0,0
+ gemini-4-argon,google,2.0,10.0,,,,True,0,0
+ gemini-4-hydrogen,google,1.5,7.5,,,,True,0,0

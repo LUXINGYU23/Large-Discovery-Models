@@ -29,7 +29,7 @@ ANALYSIS = TASK / "experiments/rsi/analysis"
 TAGGER = ANALYSIS / "tagger.py"
 
 EXPERIMENTS = ("smoke", "rehearsal", "Q1", "M1", "E1", "E2", "E3", "X1", "F1",
-               "M0", "N25", "W25", "X4", "OR", "L40")
+               "M0", "N25", "W25", "X4", "OR", "L40", "SHINKA")
 DEVELOPMENT_EXPERIMENTS = ("smoke", "rehearsal")
 DEVELOPMENT_RELEASE = "rsi-dev"
 HASH_FIELDS = ("task_brief", "renderer", "tool", "implementation", "evaluator_image",
