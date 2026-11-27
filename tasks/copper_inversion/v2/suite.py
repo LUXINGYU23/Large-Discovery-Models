@@ -337,13 +337,17 @@ class SuiteEvaluator:
 
     def __init__(self,root,execution,manifest_path,seconds=120,slots=None,objective="confirmation",purpose=None,
                  *,anonymize_cases=False,canonical_origin=False,randomize_orientation=False,
-                 resample=None,confirmation_packs=None,objective_version=None):
+                 resample=None,confirmation_packs=None,objective_version=None,seed_override=None):
         if any(type(v) is not bool for v in (anonymize_cases,canonical_origin,randomize_orientation)):
             raise ValueError("invalid case isolation flags")
+        if seed_override is not None and (type(seed_override) is not int or seed_override<0):
+            raise ValueError("invalid seed_override")
         self.root=Path(root);self.execution=execution
         self.slots=slots
         self.manifest_path=Path(manifest_path).resolve()
         self.manifest=load_manifest(self.manifest_path)
+        self.seed_override=seed_override
+        self.seeds=self.manifest["seeds"] if seed_override is None else [seed_override]
         if any('confirmation/problem.npz' not in case['sha256'] and 'confirmation/c0/problem.npz' not in case['sha256']
                for case in self.manifest['cases']):
             raise ValueError('independent confirmation measurements required for evaluation')
@@ -389,9 +393,132 @@ class SuiteEvaluator:
         if self.resample is not None:self.context["resample"]=dict(self.resample)
         if self.confirmation_packs is not None:
             self.context["confirmation_packs"]=list(self.confirmation_packs) if isinstance(self.confirmation_packs,list) else self.confirmation_packs
+        self._base_context=dict(self.context)
+        if self.seed_override is not None:
+            self.context["seed_override"]=self.seed_override
 
     def evaluation_attempt_usage_key(self,candidate):
         return digest(dict(context=self.context,source=candidate.canonical_key))
+
+    def _case_key(self,candidate):
+        return digest(dict(context=self._base_context,source=candidate.canonical_key))
+
+    def _prepare_score_truth(self,key,case,case_root):
+        raw_truth=self.manifest_path.parent/case["truth"]
+        root_conf=raw_truth/"confirmation/problem.json"
+        restamp=root_conf.is_file() and json.loads(root_conf.read_text())["objective_version"]!=self.objective_version
+        if (self.resample is not None or self.confirmation_packs is not None or restamp
+                or not root_conf.is_file()):
+            score_truth=case_root/"score-truth"
+            score_truth.mkdir(parents=True,exist_ok=True)
+            truth_dst=score_truth/"truth.npy"
+            if not truth_dst.exists() and (raw_truth/"truth.npy").exists():
+                try:os.link(raw_truth/"truth.npy",truth_dst)
+                except OSError:shutil.copy2(raw_truth/"truth.npy",truth_dst)
+            base_conf=_load_confirmation(raw_truth,self.confirmation_packs)
+            if base_conf["objective_version"]!=self.objective_version:
+                base_conf={**base_conf,"objective_version":self.objective_version}
+            if self.resample is not None:
+                from ..experiments.rsi.measurements import thin_confirmation
+                rseed=confirmation_resample_seed(key,case["case_id"])
+                thinned,_=thin_confirmation(base_conf,rseed,self.resample["fraction"],
+                                            self.resample.get("outcrop_grid",4))
+                save_problem(thinned,score_truth/"confirmation")
+                save_problem(base_conf,score_truth/"full_confirmation")
+            else:
+                save_problem(base_conf,score_truth/"confirmation")
+            _chmod_readable(score_truth)
+            return score_truth
+        return raw_truth
+
+    def evaluate_precomputed(self,candidate_id,models_by_case_seed):
+        """Score frozen precomputed per-(case, seed) models with the independent scorer."""
+        if load_manifest(self.manifest_path)!=self.manifest or source_identity()!=self.context["implementation"]:
+            raise EvaluationPaused("suite scientific identity changed")
+        if self.anonymize_cases or self.canonical_origin or self.randomize_orientation:
+            raise ValueError("precomputed field evaluation uses raw public case coordinates")
+        key=digest(dict(context=self.context,precomputed=candidate_id))
+        root=self.root/"evaluations"/key;root.mkdir(parents=True,exist_ok=True)
+        result_path=root/"result.json"
+        if result_path.exists():return EvaluationResult(**json.loads(result_path.read_text()))
+        merged=getattr(self.execution,"merged",False) is True
+        def prepare_one(item):
+            case,seed=item
+            identity=dict(evaluation=key,case=case["case_id"],seed=seed)
+            case_root=root/case["case_id"]/str(seed);case_root.mkdir(parents=True,exist_ok=True)
+            row_path=case_root/"receipt.json"
+            if row_path.exists():return json.loads(row_path.read_text())
+            entry=models_by_case_seed[case["case_id"]][str(seed)]
+            model_src=Path(entry["path"])
+            if model_src.is_symlink() or file_hash(model_src)!=entry["sha256"]:
+                raise EvaluationPaused("frozen model changed")
+            raw_problem=read_problem(self.manifest_path.parent/case["public"])
+            scored_problem=(raw_problem if raw_problem["objective_version"]==self.objective_version
+                            else {**raw_problem,"objective_version":self.objective_version})
+            score_inputs=case_root/"input"
+            save_problem(scored_problem,score_inputs)
+            wall_s=float(entry.get("wall_seconds",0.))
+            row=dict(parent_id=case["parent_id"],case_id=case["case_id"],seed=seed,
+                status="failed",metrics={"iou":0.},solver_wall_seconds=wall_s,jobs=1,
+                solver_resources=None,error="invalid precomputed model")
+            if self.objective!="confirmation":row["objective"]=self.objective
+            if self._explicit_objective_version or self.objective_version!=LEGACY_OBJECTIVE:
+                row["objective_version"]=self.objective_version
+            try:
+                sha=freeze_model(model_src,case_root/"model",raw_problem["shape"])
+            except OSError as exc:
+                raise EvaluationPaused("model freeze infrastructure I/O failed") from exc
+            except ValueError as exc:
+                row.update(status="invalid",error=str(exc))
+                atomic_json_write(row_path,row)
+                return row
+            score_truth=self._prepare_score_truth(key,case,case_root)
+            scoring=dict(identity=identity,model=sha,inputs=score_inputs,model_dir=case_root/"model",
+                truth=score_truth,row_path=row_path)
+            if merged:return row,scoring
+            score_root,s=self.execution.run(dict(identity=identity,model=sha),phase="scorer",inputs=score_inputs,
+                model=case_root/"model",truth=score_truth,timeout=30,science_module="v2")
+            if s["exit_code"] or s["reason"] or s["oom"]:
+                raise EvaluationPaused("independent scorer infrastructure failure")
+            scored(row,json.loads((score_root/"output/result.json").read_text()))
+            atomic_json_write(row_path,row)
+            return row
+        def scored(row,outcome):
+            if outcome.get("status") not in {"invalid","succeeded"}:
+                raise EvaluationPaused("invalid independent scorer receipt")
+            value=outcome.get("metrics",{}).get("iou")
+            if not isinstance(value,(int,float)) or not np.isfinite(value) or not 0<=value<=1:
+                raise EvaluationPaused("invalid hidden geometry metric")
+            row.update(outcome);row["jobs"]=1
+            if row["status"]=="succeeded":row["error"]=""
+        plan=[(case,seed) for case in self.manifest["cases"] for seed in self.manifest["seeds"]]
+        with ThreadPoolExecutor(max_workers=self.case_workers) as pool:
+            rows=list(pool.map(prepare_one,plan))
+        pending=[(i,item) for i,item in enumerate(rows) if isinstance(item,tuple)]
+        if pending:
+            jobs=[job for _,(_,job) in pending]
+            score_root,s=self.execution.run(dict(evaluation=key,scoring=[dict(identity=j["identity"],model=j["model"]) for j in jobs]),
+                phase="scorer",cases=[dict(inputs=j["inputs"],model=j["model_dir"],truth=j["truth"]) for j in jobs],
+                timeout=30+5*len(jobs),science_module="v2")
+            if s["exit_code"] or s["reason"] or s["oom"]:
+                raise EvaluationPaused("independent scorer infrastructure failure")
+            outcomes=json.loads((score_root/"output/results.json").read_text())
+            if not isinstance(outcomes,list) or len(outcomes)!=len(jobs):
+                raise EvaluationPaused("invalid independent scorer receipt")
+            for (index,(row,job)),outcome in zip(pending,outcomes):
+                if not isinstance(outcome,dict):raise EvaluationPaused("invalid independent scorer receipt")
+                scored(row,outcome)
+                atomic_json_write(job["row_path"],row)
+                rows[index]=row
+        jobs=sum(row["jobs"] for row in rows)
+        wall=sum(row["solver_wall_seconds"] for row in rows)
+        metrics=aggregate(rows)
+        result=EvaluationResult(candidate_id,"succeeded",metrics=metrics,
+            resource_usage=dict(benchmark_jobs=jobs,solver_wall_seconds=wall,suite_evaluations=1),
+            artifacts={},metadata={EVALUATION_ATTEMPT_RECEIPT_KEY:key,"suite_digest":self.context["manifest"]})
+        atomic_json_write(root/"private-case-results.json",rows)
+        atomic_json_write(result_path,result.to_dict())
+        return result
 
     def evaluate(self,candidate):
         # Verify even on resume; a path being unchanged does not imply data are.
@@ -401,6 +528,7 @@ class SuiteEvaluator:
         if file_hash(source)!=candidate.canonical_key:raise EvaluationPaused("source changed")
         if self.slots is not None:self.slots.reserve(candidate.canonical_key)
         key=self.evaluation_attempt_usage_key(candidate)
+        case_key=self._case_key(candidate)
         root=self.root/"evaluations"/key;root.mkdir(parents=True,exist_ok=True)
         result_path=root/"result.json"
         if result_path.exists():return EvaluationResult(**json.loads(result_path.read_text()))
@@ -416,9 +544,9 @@ class SuiteEvaluator:
             raw_problem=read_problem(self.manifest_path.parent/case["public"])
             scored_problem=(raw_problem if raw_problem["objective_version"]==self.objective_version
                             else {**raw_problem,"objective_version":self.objective_version})
-            orientation=case_orientation(key,case["case_id"]) if self.randomize_orientation else 0
+            orientation=case_orientation(case_key,case["case_id"]) if self.randomize_orientation else 0
             if self.anonymize_cases or self.canonical_origin or orientation:
-                cid=opaque_case_id(key,case["case_id"]) if self.anonymize_cases else None
+                cid=opaque_case_id(case_key,case["case_id"]) if self.anonymize_cases else None
                 problem=canonical_problem(scored_problem,case_id=cid,canonical_origin=self.canonical_origin,
                                           orientation=orientation)
                 save_problem(problem,inputs)
@@ -462,30 +590,7 @@ class SuiteEvaluator:
                 except ValueError as exc:
                     row.update(status="invalid",error=str(exc))
                 else:
-                    raw_truth=self.manifest_path.parent/case["truth"]
-                    restamp=raw_problem["objective_version"]!=self.objective_version
-                    if (self.resample is not None or self.confirmation_packs is not None or restamp
-                            or not (raw_truth/"confirmation/problem.json").is_file()):
-                        score_truth=case_root/"score-truth"
-                        score_truth.mkdir(parents=True,exist_ok=True)
-                        truth_dst=score_truth/"truth.npy"
-                        if not truth_dst.exists() and (raw_truth/"truth.npy").exists():
-                            try:os.link(raw_truth/"truth.npy",truth_dst)
-                            except OSError:shutil.copy2(raw_truth/"truth.npy",truth_dst)
-                        base_conf=_load_confirmation(raw_truth,self.confirmation_packs)
-                        if restamp:base_conf={**base_conf,"objective_version":self.objective_version}
-                        if self.resample is not None:
-                            from ..experiments.rsi.measurements import thin_confirmation
-                            rseed=confirmation_resample_seed(key,case["case_id"])
-                            thinned,_=thin_confirmation(base_conf,rseed,self.resample["fraction"],
-                                                        self.resample.get("outcrop_grid",4))
-                            save_problem(thinned,score_truth/"confirmation")
-                            save_problem(base_conf,score_truth/"full_confirmation")
-                        else:
-                            save_problem(base_conf,score_truth/"confirmation")
-                        _chmod_readable(score_truth)
-                    else:
-                        score_truth=raw_truth
+                    score_truth=self._prepare_score_truth(case_key,case,case_root)
                     scoring=dict(identity=identity,model=sha,inputs=score_inputs,model_dir=case_root/"model",
                         truth=score_truth,row_path=row_path)
                     if merged:return row,scoring
@@ -505,7 +610,7 @@ class SuiteEvaluator:
             # jobs counts solve + score per case, also when scoring is merged.
             row.update(outcome);row["jobs"]=2
             if row["status"]=="succeeded":row["error"]=""
-        plan=[(case,seed) for case in self.manifest["cases"] for seed in self.manifest["seeds"]]
+        plan=[(case,seed) for case in self.manifest["cases"] for seed in self.seeds]
         # Case concurrency is a scheduling parameter (case_workers), not part of the key.
         with ThreadPoolExecutor(max_workers=self.case_workers) as pool:
             rows=list(pool.map(solve_one,plan))

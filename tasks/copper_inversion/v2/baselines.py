@@ -540,15 +540,73 @@ def ellipsoid_fit(problem, budget=None, seed=0):
     return _enforce_legal(problem, mask, rank)
 
 
-from .lit_baselines import LIT_NATIVE_SOLVER_NAMES, LIT_REFERENCE_SOLVERS, LIT_SOLVER_NAMES
+DEFAULT_Z_STRETCH = 2.0
+
+
+def stretched_nearest_class_default(problem, budget=None, seed=0):
+    """Default stretched nearest-class solver: fixed z_stretch=2.0 and native sign (dp < dn), no CV."""
+    del budget, seed
+    validate(problem)
+    xyz = _grid_centers(problem)
+    feasible = problem["domain_mask"] & ~problem["forbidden_mask"]
+    pts, lab = _binary_observations(problem)
+    if not lab.any():
+        center = np.asarray(problem["origin"]) + .5 * np.asarray(problem["shape"]) * problem["spacing"]
+        rank = -np.linalg.norm(xyz - center, axis=-1)
+        return _enforce_legal(problem, np.zeros(tuple(problem["shape"]), bool), rank)
+    sc = np.array([1.0, 1.0, DEFAULT_Z_STRETCH])
+    G = xyz[feasible] * sc
+    X = pts * sc
+    dp = cKDTree(X[lab]).query(G)[0]
+    if (~lab).any():
+        dn = cKDTree(X[~lab]).query(G)[0]
+        score_f = (dn - dp) / (dn + dp + 1e-9)
+    else:
+        score_f = np.ones(len(G), dtype=float) - 1e-4 * dp
+    rank = np.full(tuple(problem["shape"]), -np.inf, dtype=float)
+    rank[feasible] = score_f
+    mask = (rank > 0.0) & feasible
+    return _enforce_legal(problem, mask, rank)
+
+
+initial_default = deterministic
+layered_horizon_default = layered_horizon
+ellipsoid_fit_default = ellipsoid_fit
+
+
+from .fdi_baseline import fdi_smooth, fdi_smooth_default, fdi_smooth_native
+from .lit_baselines import (
+    LIT_DEFAULT_SOLVER_NAMES,
+    LIT_NATIVE_SOLVER_NAMES,
+    LIT_REFERENCE_SOLVERS,
+    LIT_SOLVER_NAMES,
+)
+from .offline_baselines import (
+    OFFLINE_DEFAULT_SOLVER_NAMES,
+    OFFLINE_NATIVE_SOLVER_NAMES,
+    OFFLINE_REFERENCE_SOLVERS,
+    OFFLINE_SOLVER_NAMES,
+)
+
+ALL_IN_CONTAINER_LIT_NAMES = tuple(LIT_SOLVER_NAMES) + ("fdi_smooth",)
+ALL_IN_CONTAINER_LIT_NATIVE_NAMES = tuple(LIT_NATIVE_SOLVER_NAMES) + ("fdi_smooth_native",)
+ALL_IN_CONTAINER_LIT_DEFAULT_NAMES = tuple(LIT_DEFAULT_SOLVER_NAMES) + ("fdi_smooth_default",)
 
 REFERENCE_SOLVERS = {
     "initial": deterministic,
+    "initial_default": initial_default,
     "deterministic": deterministic,
     "stretched_nearest_class": stretched_nearest_class,
+    "stretched_nearest_class_default": stretched_nearest_class_default,
     "layered_horizon": layered_horizon,
+    "layered_horizon_default": layered_horizon_default,
     "ellipsoid_fit": ellipsoid_fit,
+    "ellipsoid_fit_default": ellipsoid_fit_default,
     **LIT_REFERENCE_SOLVERS,
+    "fdi_smooth": fdi_smooth,
+    "fdi_smooth_native": fdi_smooth_native,
+    "fdi_smooth_default": fdi_smooth_default,
+    **OFFLINE_REFERENCE_SOLVERS,
 }
 
 
@@ -618,8 +676,8 @@ def _family_map(release_dir, split, manifest):
     return {c["case_id"]: direct.get(c["case_id"], "unknown") for c in cases}
 
 
-def evaluate_release(release_dir, split, solver_name):
-    """Evaluate a deterministic reference solver on a train or calibration split (aggregates only)."""
+def evaluate_release(release_dir, split, solver_name, *, fields_dir=None, seed=0):
+    """Evaluate a reference solver on a train or calibration split (aggregates only)."""
     if solver_name not in REFERENCE_SOLVERS:
         raise ValueError(f"unknown solver: {solver_name!r}")
     manifest_path = _resolve_manifest(release_dir, split)
@@ -627,7 +685,10 @@ def evaluate_release(release_dir, split, solver_name):
     root = manifest_path.parent
     families = _family_map(release_dir, split, manifest)
     solver = REFERENCE_SOLVERS[solver_name]
-    accepts_diag = "diagnostics" in inspect.signature(solver).parameters
+    params = inspect.signature(solver).parameters
+    accepts_diag = "diagnostics" in params
+    accepts_fields = "fields_dir" in params
+    accepts_split = "split" in params
     budget = {"wall_time_seconds": 120.0}
     per_family = {}
     all_rows = []
@@ -641,9 +702,17 @@ def evaluate_release(release_dir, split, solver_name):
         problem = read_problem(root / case["public"])
         truth = np.load(root / case["truth"] / "truth.npy", allow_pickle=False)
         diag = {}
+        kwargs = {}
+        if accepts_diag:
+            kwargs["diagnostics"] = diag
+        if accepts_fields and fields_dir is not None:
+            kwargs["fields_dir"] = fields_dir
+        if accepts_split:
+            kwargs["split"] = split
         t0 = time.monotonic()
-        field = solver(problem, budget, 0, diagnostics=diag) if accepts_diag else solver(problem, budget, 0)
-        case_times.append(time.monotonic() - t0)
+        field = solver(problem, budget, int(seed), **kwargs)
+        elapsed = float(diag["wall_seconds"]) if (accepts_diag and "wall_seconds" in diag) else (time.monotonic() - t0)
+        case_times.append(elapsed)
         stats = compare(problem, field, truth)
         fam = families[case["case_id"]]
         per_family.setdefault(fam, []).append(stats)
@@ -680,10 +749,12 @@ def evaluate_release(release_dir, split, solver_name):
         "release": str(Path(release_dir)),
         "split": split,
         "solver": solver_name,
+        "seed": int(seed),
+        "generator_matched": bool(solver_name in ("potential_field", "potential_field_native")),
         "overall": summarize(all_rows),
         "family_macro_iou": family_macro_iou,
         "by_family": by_family,
-        "wall_seconds": round(wall, 3),
+        "wall_seconds": round(float(sum(case_times)) if accepts_fields else wall, 3),
         "median_case_seconds": round(float(np.median(case_times)), 3) if case_times else 0.0,
         "repair_rate": (float(repaired_count) / n_cases) if (accepts_diag and n_cases) else None,
         "fallback_count": fallback_count if accepts_diag else None,
@@ -721,22 +792,28 @@ def _format_table(reports):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Evaluate deterministic reference solvers on train or calibration splits.")
+    parser = argparse.ArgumentParser(description="Evaluate reference solvers on train or calibration splits.")
     parser.add_argument("--release", type=Path, required=True, help="Release directory containing split manifests.")
     parser.add_argument("--split", choices=("train", "train_s", "calibration"), required=True)
     solver_choices = tuple(REFERENCE_SOLVERS.keys()) + ("all", "all_lit", "all_lit_native")
     parser.add_argument("--solver", choices=solver_choices, required=True)
+    parser.add_argument("--fields-dir", type=Path, default=None,
+                        help="Stage-A output directory for offline two-stage solvers (potential_field, inr_mlp, rf_xyz).")
+    parser.add_argument("--seed", type=int, default=0, help="Execution seed (used by stochastic offline solvers).")
     parser.add_argument("--json", action="store_true", help="Print aggregate results as JSON.")
     args = parser.parse_args(argv)
     if args.solver == "all":
         names = ["initial", "stretched_nearest_class", "layered_horizon", "ellipsoid_fit"]
     elif args.solver == "all_lit":
-        names = list(LIT_SOLVER_NAMES)
+        names = list(ALL_IN_CONTAINER_LIT_NAMES)
     elif args.solver == "all_lit_native":
-        names = list(LIT_NATIVE_SOLVER_NAMES)
+        names = list(ALL_IN_CONTAINER_LIT_NATIVE_NAMES)
     else:
         names = [args.solver]
-    reports = [evaluate_release(args.release, args.split, name) for name in names]
+    reports = [
+        evaluate_release(args.release, args.split, name, fields_dir=args.fields_dir, seed=args.seed)
+        for name in names
+    ]
     if args.json:
         print(json.dumps(reports[0] if len(reports) == 1 else reports, sort_keys=True, indent=2))
     else:

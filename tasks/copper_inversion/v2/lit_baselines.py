@@ -701,6 +701,119 @@ svm_rbf_native = _make_native_wrapper(svm_rbf)
 gp_classifier_native = _make_native_wrapper(gp_classifier)
 knn_idw_native = _make_native_wrapper(knn_idw)
 
+# ---------------------------------------------------------------------------
+# Fixed-default ("zero hyperparameter search, zero CV, native rule") variants
+# ---------------------------------------------------------------------------
+
+RBF_SDF_DEFAULT_CONFIG = {"s_z": 4, "kernel": "linear", "alpha": 0.0}
+INDICATOR_KRIGING_DEFAULT_CONFIG = INDICATOR_KRIGING_CONFIGS[0]
+SVM_RBF_DEFAULT_CONFIG = SVM_RBF_CONFIGS[0]
+GP_CLASSIFIER_DEFAULT_CONFIG = GP_CLASSIFIER_CONFIGS[0]
+KNN_IDW_DEFAULT_CONFIG = {"s_z": 4, "k": 5}
+
+
+def rbf_sdf_default(problem, budget=None, seed=0, *, diagnostics=None):
+    """M1 default: 3D biharmonic RBF (kernel='linear', degree=1, smoothing=0.0, s_z=4), native f > 0."""
+    del seed
+    data = harness.extract_public_data(problem)
+    center, E, hbar, h_hole = data["center"], data["E"], data["hbar"], data["h_hole"]
+
+    def fit(cfg, X_b, y_b, w_b, X_c, prob):
+        return fit_rbf_sdf(
+            cfg, X_b, y_b, w_b, X_c, prob,
+            center=center, E=E, hbar=hbar, h_hole=h_hole,
+        )
+
+    return harness.solve_default(
+        problem, budget, RBF_SDF_DEFAULT_CONFIG, fit, tau0=0.0, diagnostics=diagnostics,
+    )
+
+
+def indicator_kriging_default(problem, budget=None, seed=0, *, diagnostics=None):
+    """M2 default: ordinary indicator kriging (exponential, nu=0.1, WLS downhole range, s_z=4), native p > 0.5."""
+    del seed
+    data = harness.extract_public_data(problem)
+    center, E, hz = data["center"], data["E"], float(data["spacing"][2])
+    eps = data["eps"]
+    drill_w = float(harness._base()._drill_observation(problem).get("weight", 1.0))
+    vario_cache = {}
+
+    def fit(cfg, X_b, y_b, w_b, X_c, prob):
+        return fit_indicator_kriging(
+            cfg, X_b, y_b, w_b, X_c, prob,
+            center=center, E=E, hz=hz, eps=eps, drill_weight=drill_w, variogram_cache=vario_cache,
+        )
+
+    return harness.solve_default(
+        problem, budget, INDICATOR_KRIGING_DEFAULT_CONFIG, fit, tau0=0.5, diagnostics=diagnostics,
+    )
+
+
+def svm_rbf_default(problem, budget=None, seed=0, *, diagnostics=None):
+    """M3 default: RBF-kernel SVM (C=1.0, ell=h_hole, s_z=4), native f > 0."""
+    del seed
+    data = harness.extract_public_data(problem)
+    center, h_hole = data["center"], data["h_hole"]
+
+    def fit(cfg, X_b, y_b, w_b, X_c, prob):
+        return fit_svm_rbf(cfg, X_b, y_b, w_b, X_c, prob, center=center, h_hole=h_hole)
+
+    return harness.solve_default(
+        problem, budget, SVM_RBF_DEFAULT_CONFIG, fit, tau0=0.0, diagnostics=diagnostics,
+    )
+
+
+def gp_classifier_default(problem, budget=None, seed=0, *, diagnostics=None):
+    """M6 default: Laplace Matérn-3/2 GP (ell=h_hole, sigma_f2=4.0, s_z=4), native f > 0, no evidence search or CV."""
+    del budget, seed
+    started = time.monotonic()
+    data = harness.extract_public_data(problem)
+    if not (data["y_b"] > 0.5).any():
+        return harness.no_ore_fallback(problem, data, diagnostics=diagnostics, started=started)
+    try:
+        pred_fn, log_q = fit_gp_laplace(
+            GP_CLASSIFIER_DEFAULT_CONFIG,
+            data["X_b"], data["y_b"], data["w_b"], data["X_c"], problem,
+            center=data["center"], h_hole=data["h_hole"],
+        )
+        f = harness.predict_chunked(pred_fn, data["G"])
+        field = harness.finalize_field(
+            problem,
+            data,
+            f,
+            0.0,
+            "native",
+            selected_config=GP_CLASSIFIER_DEFAULT_CONFIG,
+            cv_score=None,
+            cv_evaluated=0,
+            deadline_stopped=False,
+            diagnostics=diagnostics,
+            started=started,
+        )
+        if diagnostics is not None:
+            diagnostics["log_evidence"] = float(log_q)
+        return field
+    except Exception:
+        return harness.stretched_fallback(
+            problem, data, diagnostics=diagnostics, started=started,
+            cv_evaluated=0, deadline_stopped=False, default_mode=True,
+        )
+
+
+def knn_idw_default(problem, budget=None, seed=0, *, diagnostics=None):
+    """M8a default: inverse-square distance-weighted k-NN (k=5, p=2, s_z=4), native f > 0.5."""
+    del seed
+    data = harness.extract_public_data(problem)
+    center = data["center"]
+
+    def fit(cfg, X_b, y_b, w_b, X_c, prob):
+        return fit_knn_idw(cfg, X_b, y_b, w_b, X_c, prob, center=center)
+
+    return harness.solve_default(
+        problem, budget, KNN_IDW_DEFAULT_CONFIG, fit, tau0=0.5, diagnostics=diagnostics,
+    )
+
+
 LIT_SOLVER_NAMES = (
     "rbf_sdf",
     "indicator_kriging",
@@ -717,6 +830,14 @@ LIT_NATIVE_SOLVER_NAMES = (
     "knn_idw_native",
 )
 
+LIT_DEFAULT_SOLVER_NAMES = (
+    "rbf_sdf_default",
+    "indicator_kriging_default",
+    "svm_rbf_default",
+    "gp_classifier_default",
+    "knn_idw_default",
+)
+
 LIT_REFERENCE_SOLVERS = {
     "rbf_sdf": rbf_sdf,
     "indicator_kriging": indicator_kriging,
@@ -728,4 +849,9 @@ LIT_REFERENCE_SOLVERS = {
     "svm_rbf_native": svm_rbf_native,
     "gp_classifier_native": gp_classifier_native,
     "knn_idw_native": knn_idw_native,
+    "rbf_sdf_default": rbf_sdf_default,
+    "indicator_kriging_default": indicator_kriging_default,
+    "svm_rbf_default": svm_rbf_default,
+    "gp_classifier_default": gp_classifier_default,
+    "knn_idw_default": knn_idw_default,
 }
