@@ -26,7 +26,8 @@ from tasks.copper_inversion.experiments.rsi.q1 import references as load_referen
 
 
 REVIEW_FILE = "blind-review-required.json"
-REFERENCE_EXPERIMENTS = ("REF", "REF2", "REF3")
+MULTI_CANDIDATE_REFERENCE_EXPERIMENTS = ("REFOE", "REFSHINKA", "REFLLM4AD", "REFGEPA")
+REFERENCE_EXPERIMENTS = ("REF", "REF2", "REF3", *MULTI_CANDIDATE_REFERENCE_EXPERIMENTS)
 
 
 def check_reviews(root, protocol_id, experiment, run_ids, review=None):
@@ -191,9 +192,12 @@ def unseal_references(root, protocol_id, refs_path, selections_path, *,
     for name, ref in refs.items():
         target = Path(mapping[name]).resolve()
         frozen, state = selection.verify(target)
-        if (len(frozen["candidates"]) != 1 or frozen["candidates"][0]["sha256"] != ref["sha256"]
-                or state["phase"] != "selected"):
-            raise ValueError("reference must have one matching, validated, untested solver")
+        cand_shas = [c["sha256"] for c in frozen["candidates"]]
+        single_ok = (len(cand_shas) >= 1 and ref["sha256"] in cand_shas
+                     if experiment in MULTI_CANDIDATE_REFERENCE_EXPERIMENTS
+                     else len(cand_shas) == 1 and cand_shas[0] == ref["sha256"])
+        if not single_ok or state["phase"] != "selected":
+            raise ValueError("reference must have matching, validated, untested solver selection")
         report = json.loads((target / "selection.json").read_text())
         if digest(report) != state["selection_sha256"] or report["selected_sha256"] != ref["sha256"]:
             raise ValueError("reference validation changed")

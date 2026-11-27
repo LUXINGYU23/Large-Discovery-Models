@@ -32,7 +32,13 @@ import numpy as np
 from ldm_tts.engine.run_store import atomic_json_write
 from tasks.copper_inversion.core.execution import digest
 from tasks.copper_inversion.experiments.rsi.freeze import layout, parse_prefix, run_manifest
-from tasks.copper_inversion.experiments.rsi.unseal import REFERENCE_EXPERIMENTS, check, load_list, _log
+from tasks.copper_inversion.experiments.rsi.unseal import (
+    MULTI_CANDIDATE_REFERENCE_EXPERIMENTS,
+    REFERENCE_EXPERIMENTS,
+    check,
+    load_list,
+    _log,
+)
 from tasks.copper_inversion.v2 import selection
 from tasks.copper_inversion.v2.suite import aggregate, file_hash, load_manifest, manifest_tiers, release_tiers
 from tasks.copper_inversion.v2.training_receipts import eligible
@@ -604,7 +610,10 @@ def export_references(root, protocol_id, *, q1=None, references=None, experiment
         for name, target in sorted(references.items()):
             target = Path(target)
             frozen, state = selection.verify(target)
-            if state["phase"] != "tested" or len(frozen["candidates"]) != 1:
+            min_ok = (len(frozen["candidates"]) >= 1
+                      if experiment in MULTI_CANDIDATE_REFERENCE_EXPERIMENTS
+                      else len(frozen["candidates"]) == 1)
+            if state["phase"] != "tested" or not min_ok:
                 raise ValueError("a domain reference needs one tested frozen solver")
             result = json.loads((target / "test-result.json").read_text())
             if (str(target.resolve()) != logged["selection_roots"][name]
@@ -627,13 +636,16 @@ def export_references(root, protocol_id, *, q1=None, references=None, experiment
                 else:
                     arm_name = ("offline_reference" if frozen["candidates"][0].get("kind") == "precomputed"
                                 else "in_container_reference")
+                judge_label = ("standard" if experiment in MULTI_CANDIDATE_REFERENCE_EXPERIMENTS
+                               and frozen.get("selection_objective", "confirmation") == "confirmation"
+                               else frozen.get("selection_objective", "confirmation"))
                 run_info = {
                     "experiment": experiment,
                     "protocol_id": protocol_id,
                     "run_id": name,
                     "arm": arm_name,
                     "tier": _reference_tier(frozen),
-                    "judge": frozen.get("selection_objective", "confirmation"),
+                    "judge": judge_label,
                     "seed": seed_val,
                 }
                 row, bodies = outcome(target, run_info, "full", True)
